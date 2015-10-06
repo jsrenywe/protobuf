@@ -1175,12 +1175,12 @@ public final class TextFormat {
      * Determines if repeated values for non-repeated fields and
      * oneofs are permitted. For example, given required/optional field "foo"
      * and a oneof containing "baz" and "qux":
-     * <li>
-     * <ul>"foo: 1 foo: 2"
-     * <ul>"baz: 1 qux: 2"
-     * <ul>merging "foo: 2" into a proto in which foo is already set, or
-     * <ul>merging "qux: 2" into a proto in which baz is already set.
-     * </li>
+     * <ul>
+     * <li>"foo: 1 foo: 2"
+     * <li>"baz: 1 qux: 2"
+     * <li>merging "foo: 2" into a proto in which foo is already set, or
+     * <li>merging "qux: 2" into a proto in which baz is already set.
+     * </ul>
      */
     public enum SingularOverwritePolicy {
       /** The last value is retained. */
@@ -1725,7 +1725,7 @@ public final class TextFormat {
    * {@link #escapeBytes(ByteString)}.  Two-digit hex escapes (starting with
    * "\x") are also recognized.
    */
-  static ByteString unescapeBytes(final CharSequence charString)
+  public static ByteString unescapeBytes(final CharSequence charString)
       throws InvalidEscapeSequenceException {
     // First convert the Java character sequence to UTF-8 bytes.
     ByteString input = ByteString.copyFromUtf8(charString.toString());
@@ -1808,7 +1808,7 @@ public final class TextFormat {
    * Thrown by {@link TextFormat#unescapeBytes} and
    * {@link TextFormat#unescapeText} when an invalid escape sequence is seen.
    */
-  static class InvalidEscapeSequenceException extends IOException {
+  public static class InvalidEscapeSequenceException extends IOException {
     private static final long serialVersionUID = -8164033650142593304L;
 
     InvalidEscapeSequenceException(final String description) {

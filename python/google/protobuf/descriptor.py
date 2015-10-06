@@ -28,8 +28,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Needs to stay compatible with Python 2.5 due to GAE.
-#
 # Copyright 2007 Google Inc. All Rights Reserved.
 
 """Descriptors essentially contain exactly the information found in a .proto
@@ -37,6 +35,8 @@ file, in types that make this information accessible in Python.
 """
 
 __author__ = 'robinson@google.com (Will Robinson)'
+
+import six
 
 from google.protobuf.internal import api_implementation
 
@@ -75,7 +75,7 @@ else:
   DescriptorMetaclass = type
 
 
-class DescriptorBase(object):
+class DescriptorBase(six.with_metaclass(DescriptorMetaclass)):
 
   """Descriptors base class.
 
@@ -90,7 +90,6 @@ class DescriptorBase(object):
         avoid some bootstrapping issues.
   """
 
-  __metaclass__ = DescriptorMetaclass
   if _USE_C_DESCRIPTORS:
     # The class, or tuple of classes, that are considered as "virtual
     # subclasses" of this descriptor class.
@@ -245,9 +244,6 @@ class Descriptor(_NestedDescriptorBase):
 
     is_extendable:  Does this type define any extension ranges?
 
-    options: (descriptor_pb2.MessageOptions) Protocol message options or None
-      to use default message options.
-
     oneofs: (list of OneofDescriptor) The list of descriptors for oneof fields
       in this message.
     oneofs_by_name: (dict str -> OneofDescriptor) Same objects as in |oneofs|,
@@ -265,7 +261,7 @@ class Descriptor(_NestedDescriptorBase):
                 file=None, serialized_start=None, serialized_end=None,
                 syntax=None):
       _message.Message._CheckCalledFromGeneratedFile()
-      return _message.Message._GetMessageDescriptor(full_name)
+      return _message.default_pool.FindMessageTypeByName(full_name)
 
   # NOTE(tmarek): The file argument redefining a builtin is nothing we can
   # fix right now since we don't know how many clients already rely on the
@@ -495,9 +491,9 @@ class FieldDescriptor(DescriptorBase):
                 has_default_value=True, containing_oneof=None):
       _message.Message._CheckCalledFromGeneratedFile()
       if is_extension:
-        return _message.Message._GetExtensionDescriptor(full_name)
+        return _message.default_pool.FindExtensionByName(full_name)
       else:
-        return _message.Message._GetFieldDescriptor(full_name)
+        return _message.default_pool.FindFieldByName(full_name)
 
   def __init__(self, name, full_name, index, number, type, cpp_type, label,
                default_value, message_type, enum_type, containing_type,
@@ -528,14 +524,9 @@ class FieldDescriptor(DescriptorBase):
     self.containing_oneof = containing_oneof
     if api_implementation.Type() == 'cpp':
       if is_extension:
-        # pylint: disable=protected-access
-        self._cdescriptor = (
-            _message.Message._GetExtensionDescriptor(full_name))
-        # pylint: enable=protected-access
+        self._cdescriptor = _message.default_pool.FindExtensionByName(full_name)
       else:
-        # pylint: disable=protected-access
-        self._cdescriptor = _message.Message._GetFieldDescriptor(full_name)
-        # pylint: enable=protected-access
+        self._cdescriptor = _message.default_pool.FindFieldByName(full_name)
     else:
       self._cdescriptor = None
 
@@ -592,7 +583,7 @@ class EnumDescriptor(_NestedDescriptorBase):
                 containing_type=None, options=None, file=None,
                 serialized_start=None, serialized_end=None):
       _message.Message._CheckCalledFromGeneratedFile()
-      return _message.Message._GetEnumDescriptor(full_name)
+      return _message.default_pool.FindEnumTypeByName(full_name)
 
   def __init__(self, name, full_name, filename, values,
                containing_type=None, options=None, file=None,
@@ -677,7 +668,7 @@ class OneofDescriptor(object):
 
     def __new__(cls, name, full_name, index, containing_type, fields):
       _message.Message._CheckCalledFromGeneratedFile()
-      return _message.Message._GetOneofDescriptor(full_name)
+      return _message.default_pool.FindOneofByName(full_name)
 
   def __init__(self, name, full_name, index, containing_type, fields):
     """Arguments are as described in the attribute description above."""
@@ -788,12 +779,8 @@ class FileDescriptor(DescriptorBase):
                 dependencies=None, syntax=None):
       # FileDescriptor() is called from various places, not only from generated
       # files, to register dynamic proto files and messages.
-      # TODO(amauryfa): Expose BuildFile() as a public function and make this
-      # constructor an implementation detail.
       if serialized_pb:
-        # pylint: disable=protected-access2
-        return _message.Message._BuildFile(serialized_pb)
-        # pylint: enable=protected-access
+        return _message.default_pool.AddSerializedFile(serialized_pb)
       else:
         return super(FileDescriptor, cls).__new__(cls)
 
@@ -814,9 +801,7 @@ class FileDescriptor(DescriptorBase):
 
     if (api_implementation.Type() == 'cpp' and
         self.serialized_pb is not None):
-      # pylint: disable=protected-access
-      _message.Message._BuildFile(self.serialized_pb)
-      # pylint: enable=protected-access
+      _message.default_pool.AddSerializedFile(self.serialized_pb)
 
   def CopyToProto(self, proto):
     """Copies this to a descriptor_pb2.FileDescriptorProto.
@@ -864,10 +849,10 @@ def MakeDescriptor(desc_proto, package='', build_file_if_cpp=True,
     file_descriptor_proto = descriptor_pb2.FileDescriptorProto()
     file_descriptor_proto.message_type.add().MergeFrom(desc_proto)
 
-    # Generate a random name for this proto file to prevent conflicts with
-    # any imported ones. We need to specify a file name so BuildFile accepts
-    # our FileDescriptorProto, but it is not important what that file name
-    # is actually set to.
+    # Generate a random name for this proto file to prevent conflicts with any
+    # imported ones. We need to specify a file name so the descriptor pool
+    # accepts our FileDescriptorProto, but it is not important what that file
+    # name is actually set to.
     proto_name = str(uuid.uuid4())
 
     if package:
@@ -877,10 +862,8 @@ def MakeDescriptor(desc_proto, package='', build_file_if_cpp=True,
     else:
       file_descriptor_proto.name = proto_name + '.proto'
 
-    # pylint: disable=protected-access
-    result = _message.Message._BuildFile(
-        file_descriptor_proto.SerializeToString())
-    # pylint: enable=protected-access
+    _message.default_pool.Add(file_descriptor_proto)
+    result = _message.default_pool.FindFileByName(file_descriptor_proto.name)
 
     if _USE_C_DESCRIPTORS:
       return result.message_types_by_name[desc_proto.name]
@@ -934,5 +917,5 @@ def MakeDescriptor(desc_proto, package='', build_file_if_cpp=True,
 
   desc_name = '.'.join(full_message_name)
   return Descriptor(desc_proto.name, desc_name, None, None, fields,
-                    nested_types.values(), enum_types.values(), [],
+                    list(nested_types.values()), list(enum_types.values()), [],
                     options=desc_proto.options)

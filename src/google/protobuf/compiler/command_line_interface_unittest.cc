@@ -63,13 +63,13 @@
 #include <google/protobuf/testing/googletest.h>
 #include <gtest/gtest.h>
 
+namespace google {
+namespace protobuf {
+namespace compiler {
 
 // Disable the whole test when we use tcmalloc for "draconian" heap checks, in
 // which case tcmalloc will print warnings that fail the plugin tests.
 #if !GOOGLE_PROTOBUF_HEAP_CHECK_DRACONIAN
-namespace google {
-namespace protobuf {
-namespace compiler {
 
 #if defined(_WIN32)
 #ifndef STDIN_FILENO
@@ -115,10 +115,15 @@ class CommandLineInterfaceTest : public testing::Test {
   // Create a subdirectory within temp_directory_.
   void CreateTempDir(const string& name);
 
+#ifdef PROTOBUF_OPENSOURCE
   // Change working directory to temp directory.
   void SwitchToTempDirectory() {
     File::ChangeWorkingDirectory(temp_directory_);
   }
+#else  // !PROTOBUF_OPENSOURCE
+  // TODO(teboring): Figure out how to change and get working directory in
+  // google3.
+#endif  // !PROTOBUF_OPENSOURCE
 
   void SetInputsAreProtoPathRelative(bool enable) {
     cli_.SetInputsAreProtoPathRelative(enable);
@@ -881,6 +886,39 @@ TEST_F(CommandLineInterfaceTest, WriteDescriptorSet) {
   EXPECT_FALSE(descriptor_set.file(0).has_source_code_info());
 }
 
+TEST_F(CommandLineInterfaceTest, WriteDescriptorSetWithDuplicates) {
+  CreateTempFile("foo.proto",
+    "syntax = \"proto2\";\n"
+    "message Foo {}\n");
+  CreateTempFile("bar.proto",
+    "syntax = \"proto2\";\n"
+    "import \"foo.proto\";\n"
+    "message Bar {\n"
+    "  optional Foo foo = 1;\n"
+    "}\n");
+  CreateTempFile("baz.proto",
+    "syntax = \"proto2\";\n"
+    "import \"foo.proto\";\n"
+    "message Baz {\n"
+    "  optional Foo foo = 1;\n"
+    "}\n");
+
+  Run("protocol_compiler --descriptor_set_out=$tmpdir/descriptor_set "
+      "--proto_path=$tmpdir bar.proto foo.proto bar.proto baz.proto");
+
+  ExpectNoErrors();
+
+  FileDescriptorSet descriptor_set;
+  ReadDescriptorSet("descriptor_set", &descriptor_set);
+  if (HasFatalFailure()) return;
+  EXPECT_EQ(3, descriptor_set.file_size());
+  EXPECT_EQ("bar.proto", descriptor_set.file(0).name());
+  EXPECT_EQ("foo.proto", descriptor_set.file(1).name());
+  EXPECT_EQ("baz.proto", descriptor_set.file(2).name());
+  // Descriptor set should not have source code info.
+  EXPECT_FALSE(descriptor_set.file(0).has_source_code_info());
+}
+
 TEST_F(CommandLineInterfaceTest, WriteDescriptorSetWithSourceInfo) {
   CreateTempFile("foo.proto",
     "syntax = \"proto2\";\n"
@@ -968,6 +1006,9 @@ TEST_F(CommandLineInterfaceTest, WriteTransitiveDescriptorSetWithSourceInfo) {
   EXPECT_TRUE(descriptor_set.file(1).has_source_code_info());
 }
 
+#ifdef _WIN32
+// TODO(teboring): Figure out how to write test on windows.
+#else
 TEST_F(CommandLineInterfaceTest, WriteDependencyManifestFileGivenTwoInputs) {
   CreateTempFile("foo.proto",
     "syntax = \"proto2\";\n"
@@ -986,6 +1027,7 @@ TEST_F(CommandLineInterfaceTest, WriteDependencyManifestFileGivenTwoInputs) {
       "Can only process one input file when using --dependency_out=FILE.\n");
 }
 
+#ifdef PROTOBUF_OPENSOURCE
 TEST_F(CommandLineInterfaceTest, WriteDependencyManifestFile) {
   CreateTempFile("foo.proto",
     "syntax = \"proto2\";\n"
@@ -1011,6 +1053,10 @@ TEST_F(CommandLineInterfaceTest, WriteDependencyManifestFile) {
 
   File::ChangeWorkingDirectory(current_working_directory);
 }
+#else  // !PROTOBUF_OPENSOURCE
+// TODO(teboring): Figure out how to change and get working directory in
+// google3.
+#endif  // !PROTOBUF_OPENSOURCE
 
 TEST_F(CommandLineInterfaceTest, WriteDependencyManifestFileForAbsolutePath) {
   CreateTempFile("foo.proto",
@@ -1032,6 +1078,7 @@ TEST_F(CommandLineInterfaceTest, WriteDependencyManifestFileForAbsolutePath) {
                     "$tmpdir/bar.proto.MockCodeGenerator.test_generator: "
                     "$tmpdir/foo.proto\\\n $tmpdir/bar.proto");
 }
+#endif  // !_WIN32
 
 // -------------------------------------------------------------------
 
@@ -1753,8 +1800,8 @@ TEST_F(EncodeDecodeTest, ProtoParseError) {
 
 }  // anonymous namespace
 
+#endif  // !GOOGLE_PROTOBUF_HEAP_CHECK_DRACONIAN
+
 }  // namespace compiler
 }  // namespace protobuf
-
-#endif  // !GOOGLE_PROTOBUF_HEAP_CHECK_DRACONIAN
 }  // namespace google

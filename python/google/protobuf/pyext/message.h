@@ -49,7 +49,6 @@ class Message;
 class Reflection;
 class FieldDescriptor;
 class Descriptor;
-class DynamicMessageFactory;
 
 using internal::shared_ptr;
 
@@ -120,7 +119,7 @@ CMessage* NewEmptyMessage(PyObject* type, const Descriptor* descriptor);
 // A new message will be created if this is a read-only default instance.
 //
 // Corresponds to reflection api method ReleaseMessage.
-int ReleaseSubMessage(Message* message,
+int ReleaseSubMessage(CMessage* self,
                       const FieldDescriptor* field_descriptor,
                       CMessage* child_cmessage);
 
@@ -144,7 +143,7 @@ PyObject* InternalGetSubMessage(
 // by slice will be removed from cmessage_list by this function.
 //
 // Corresponds to reflection api method RemoveLast.
-int InternalDeleteRepeatedField(Message* message,
+int InternalDeleteRepeatedField(CMessage* self,
                                 const FieldDescriptor* field_descriptor,
                                 PyObject* slice, PyObject* cmessage_list);
 
@@ -153,10 +152,15 @@ int InternalSetScalar(CMessage* self,
                       const FieldDescriptor* field_descriptor,
                       PyObject* value);
 
+// Sets the specified scalar value to the message.  Requires it is not a Oneof.
+int InternalSetNonOneofScalar(Message* message,
+                              const FieldDescriptor* field_descriptor,
+                              PyObject* arg);
+
 // Retrieves the specified scalar value from the message.
 //
 // Returns a new python reference.
-PyObject* InternalGetScalar(CMessage* self,
+PyObject* InternalGetScalar(const Message* message,
                             const FieldDescriptor* field_descriptor);
 
 // Clears the message, removing all contained data. Extension dictionary and
@@ -216,9 +220,6 @@ PyObject* FindInitializationErrors(CMessage* self);
 int SetOwner(CMessage* self, const shared_ptr<Message>& new_owner);
 
 int AssureWritable(CMessage* self);
-
-DynamicMessageFactory* GetMessageFactory();
-
 }  // namespace cmessage
 
 
@@ -279,7 +280,7 @@ extern PyObject* kint64min_py;
 extern PyObject* kint64max_py;
 extern PyObject* kuint64max_py;
 
-#define C(str) const_cast<char*>(str)
+#define FULL_MODULE_NAME "google.protobuf.pyext._message"
 
 void FormatTypeError(PyObject* arg, char* expected_types);
 template<class T>

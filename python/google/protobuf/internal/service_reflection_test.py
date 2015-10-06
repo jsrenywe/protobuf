@@ -34,8 +34,10 @@
 
 __author__ = 'petar@google.com (Petar Petrov)'
 
-import unittest
-
+try:
+  import unittest2 as unittest
+except ImportError:
+  import unittest
 from google.protobuf import unittest_pb2
 from google.protobuf import service_reflection
 from google.protobuf import service
@@ -126,8 +128,7 @@ class FooUnitTest(unittest.TestCase):
     # Invoke method.
     stub.Foo(rpc_controller, request, MyCallback)
 
-    self.assertTrue(isinstance(self.callback_response,
-                               unittest_pb2.FooResponse))
+    self.assertIsInstance(self.callback_response, unittest_pb2.FooResponse)
     self.assertEqual(request, channel.request)
     self.assertEqual(rpc_controller, channel.controller)
     self.assertEqual(stub.GetDescriptor().methods[0], channel.method)

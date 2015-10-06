@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "0610"
+   LastUpgradeVersion = "0630"
    version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -31,6 +31,20 @@
                BlueprintIdentifier = "F4487C551A9F8F8100531423"
                BuildableName = "libTestSingleSourceBuild.a"
                BlueprintName = "TestSingleSourceBuild"
+               ReferencedContainer = "container:ProtocolBuffers_iOS.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8BBEA4A5147C727100C4ADB7"
+               BuildableName = "UnitTests.xctest"
+               BlueprintName = "UnitTests"
                ReferencedContainer = "container:ProtocolBuffers_iOS.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>

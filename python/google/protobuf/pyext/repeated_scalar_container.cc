@@ -39,10 +39,12 @@
 #endif
 
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/dynamic_message.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/pyext/descriptor.h>
+#include <google/protobuf/pyext/descriptor_pool.h>
 #include <google/protobuf/pyext/message.h>
 #include <google/protobuf/pyext/scoped_pyobject_ptr.h>
 
@@ -68,7 +70,7 @@ static int InternalAssignRepeatedField(
                                              self->parent_field_descriptor);
   for (Py_ssize_t i = 0; i < PyList_GET_SIZE(list); ++i) {
     PyObject* value = PyList_GET_ITEM(list, i);
-    if (Append(self, value) == NULL) {
+    if (ScopedPyObjectPtr(Append(self, value)) == NULL) {
       return -1;
     }
   }
@@ -102,7 +104,7 @@ static int AssignItem(RepeatedScalarContainer* self,
 
   if (arg == NULL) {
     ScopedPyObjectPtr py_index(PyLong_FromLong(index));
-    return cmessage::InternalDeleteRepeatedField(message, field_descriptor,
+    return cmessage::InternalDeleteRepeatedField(self->parent, field_descriptor,
                                                  py_index, NULL);
   }
 
@@ -470,7 +472,7 @@ static int AssSubscript(RepeatedScalarContainer* self,
 
   if (value == NULL) {
     return cmessage::InternalDeleteRepeatedField(
-        message, field_descriptor, slice, NULL);
+        self->parent, field_descriptor, slice, NULL);
   }
 
   if (!create_list) {
@@ -510,7 +512,7 @@ PyObject* Extend(RepeatedScalarContainer* self, PyObject* value) {
   }
   ScopedPyObjectPtr next;
   while ((next.reset(PyIter_Next(iter))) != NULL) {
-    if (Append(self, next) == NULL) {
+    if (ScopedPyObjectPtr(Append(self, next)) == NULL) {
       return NULL;
     }
   }
@@ -690,8 +692,7 @@ static int InitializeAndCopyToParentContainer(
   if (values == NULL) {
     return -1;
   }
-  Message* new_message = cmessage::GetMessageFactory()->GetPrototype(
-      from->message->GetDescriptor())->New();
+  Message* new_message = from->message->New();
   to->parent = NULL;
   to->parent_field_descriptor = from->parent_field_descriptor;
   to->message = new_message;
@@ -769,9 +770,7 @@ static PyMethodDef Methods[] = {
 
 PyTypeObject RepeatedScalarContainer_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
-  // Keep the fully qualified _message symbol in a line for opensource.
-  "google.protobuf.pyext._message."
-  "RepeatedScalarContainer",           // tp_name
+  FULL_MODULE_NAME ".RepeatedScalarContainer",  // tp_name
   sizeof(RepeatedScalarContainer),     // tp_basicsize
   0,                                   //  tp_itemsize
   (destructor)repeated_scalar_container::Dealloc,  //  tp_dealloc
@@ -783,7 +782,7 @@ PyTypeObject RepeatedScalarContainer_Type = {
   0,                                   //  tp_as_number
   &repeated_scalar_container::SqMethods,   //  tp_as_sequence
   &repeated_scalar_container::MpMethods,   //  tp_as_mapping
-  0,                                   //  tp_hash
+  PyObject_HashNotImplemented,         //  tp_hash
   0,                                   //  tp_call
   0,                                   //  tp_str
   0,                                   //  tp_getattro

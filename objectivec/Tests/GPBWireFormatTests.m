@@ -32,9 +32,10 @@
 
 #import "GPBCodedInputStream.h"
 #import "GPBMessage_PackagePrivate.h"
-#import "GPBField_PackagePrivate.h"
+#import "GPBUnknownField_PackagePrivate.h"
 #import "google/protobuf/Unittest.pbobjc.h"
 #import "google/protobuf/UnittestMset.pbobjc.h"
+#import "google/protobuf/UnittestMsetWireFormat.pbobjc.h"
 
 @interface WireFormatTests : GPBTestCase
 @end
@@ -47,7 +48,7 @@
   NSData* rawBytes = message.data;
   XCTAssertEqual(message.serializedSize, (size_t)rawBytes.length);
 
-  TestAllTypes* message2 = [TestAllTypes parseFromData:rawBytes];
+  TestAllTypes* message2 = [TestAllTypes parseFromData:rawBytes error:NULL];
 
   [self assertAllFieldsSet:message2 repeatedCount:kGPBDefaultRepeatCount];
 }
@@ -59,7 +60,8 @@
   NSData* rawBytes = message.data;
   XCTAssertEqual(message.serializedSize, (size_t)rawBytes.length);
 
-  TestPackedTypes* message2 = [TestPackedTypes parseFromData:rawBytes];
+  TestPackedTypes* message2 =
+      [TestPackedTypes parseFromData:rawBytes error:NULL];
 
   [self assertPackedFieldsSet:message2 repeatedCount:kGPBDefaultRepeatCount];
 }
@@ -74,7 +76,7 @@
   NSData* rawBytes = message.data;
   XCTAssertEqual(message.serializedSize, (size_t)rawBytes.length);
 
-  TestAllTypes* message2 = [TestAllTypes parseFromData:rawBytes];
+  TestAllTypes* message2 = [TestAllTypes parseFromData:rawBytes error:NULL];
 
   [self assertAllFieldsSet:message2 repeatedCount:kGPBDefaultRepeatCount];
 }
@@ -103,8 +105,9 @@
 
   GPBExtensionRegistry* registry = [self extensionRegistry];
 
-  TestAllExtensions* message2 =
-      [TestAllExtensions parseFromData:rawBytes extensionRegistry:registry];
+  TestAllExtensions* message2 = [TestAllExtensions parseFromData:rawBytes
+                                               extensionRegistry:registry
+                                                           error:NULL];
 
   [self assertAllExtensionsSet:message2 repeatedCount:kGPBDefaultRepeatCount];
 }
@@ -124,8 +127,9 @@
 
   GPBExtensionRegistry* registry = [self extensionRegistry];
 
-  TestPackedExtensions* message2 =
-      [TestPackedExtensions parseFromData:rawBytes extensionRegistry:registry];
+  TestPackedExtensions* message2 = [TestPackedExtensions parseFromData:rawBytes
+                                                     extensionRegistry:registry
+                                                                 error:NULL];
 
   [self assertPackedExtensionsSet:message2
                     repeatedCount:kGPBDefaultRepeatCount];
@@ -140,8 +144,8 @@ const int kUnknownTypeId = 1550055;
       setI:123];
   [[message_set getExtension:[TestMessageSetExtension2 messageSetExtension]]
       setStr:@"foo"];
-  GPBField* unknownField =
-      [[[GPBField alloc] initWithNumber:kUnknownTypeId] autorelease];
+  GPBUnknownField* unknownField =
+      [[[GPBUnknownField alloc] initWithNumber:kUnknownTypeId] autorelease];
   [unknownField addLengthDelimited:[NSData dataWithBytes:"bar" length:3]];
   GPBUnknownFieldSet* unknownFieldSet =
       [[[GPBUnknownFieldSet alloc] init] autorelease];
@@ -151,23 +155,25 @@ const int kUnknownTypeId = 1550055;
   NSData* data = [message_set data];
 
   // Parse back using RawMessageSet and check the contents.
-  RawMessageSet* raw = [RawMessageSet parseFromData:data];
+  RawMessageSet* raw = [RawMessageSet parseFromData:data error:NULL];
 
   XCTAssertEqual([raw.unknownFields countOfFields], (NSUInteger)0);
 
   XCTAssertEqual(raw.itemArray.count, (NSUInteger)3);
-  XCTAssertEqual([raw.itemArray[0] typeId],
+  XCTAssertEqual((uint32_t)[raw.itemArray[0] typeId],
                  [TestMessageSetExtension1 messageSetExtension].fieldNumber);
-  XCTAssertEqual([raw.itemArray[1] typeId],
+  XCTAssertEqual((uint32_t)[raw.itemArray[1] typeId],
                  [TestMessageSetExtension2 messageSetExtension].fieldNumber);
   XCTAssertEqual([raw.itemArray[2] typeId], kUnknownTypeId);
 
   TestMessageSetExtension1* message1 =
-      [TestMessageSetExtension1 parseFromData:[raw.itemArray[0] message]];
+      [TestMessageSetExtension1 parseFromData:[((RawMessageSet_Item*)raw.itemArray[0]) message]
+                                        error:NULL];
   XCTAssertEqual(message1.i, 123);
 
   TestMessageSetExtension2* message2 =
-      [TestMessageSetExtension2 parseFromData:[raw.itemArray[1] message]];
+      [TestMessageSetExtension2 parseFromData:[((RawMessageSet_Item*)raw.itemArray[1]) message]
+                                        error:NULL];
   XCTAssertEqualObjects(message2.str, @"foo");
 
   XCTAssertEqualObjects([raw.itemArray[2] message],
@@ -209,7 +215,8 @@ const int kUnknownTypeId = 1550055;
   // Parse as a TestMessageSet and check the contents.
   TestMessageSet* messageSet =
       [TestMessageSet parseFromData:data
-                  extensionRegistry:[UnittestMsetRoot extensionRegistry]];
+                  extensionRegistry:[UnittestMsetRoot extensionRegistry]
+                              error:NULL];
 
   XCTAssertEqual(
       [[messageSet
@@ -221,7 +228,7 @@ const int kUnknownTypeId = 1550055;
       @"foo");
 
   XCTAssertEqual([messageSet.unknownFields countOfFields], (NSUInteger)1);
-  GPBField* unknownField = [messageSet.unknownFields getField:kUnknownTypeId];
+  GPBUnknownField* unknownField = [messageSet.unknownFields getField:kUnknownTypeId];
   XCTAssertNotNil(unknownField);
   XCTAssertEqual(unknownField.lengthDelimitedList.count, (NSUInteger)1);
   XCTAssertEqualObjects(unknownField.lengthDelimitedList[0],

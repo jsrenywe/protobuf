@@ -44,6 +44,7 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/wire_format.h>
 #include <google/protobuf/io/tokenizer.h>
+#include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/map_util.h>
@@ -686,6 +687,8 @@ bool Parser::ParseMessageStatement(DescriptorProto* message,
     LocationRecorder location(message_location,
                               DescriptorProto::kExtensionRangeFieldNumber);
     return ParseExtensions(message, location, containing_file);
+  } else if (LookingAt("reserved")) {
+    return ParseReserved(message, message_location);
   } else if (LookingAt("extend")) {
     LocationRecorder location(message_location,
                               DescriptorProto::kExtensionFieldNumber);
@@ -733,6 +736,13 @@ bool Parser::ParseMessageField(FieldDescriptorProto* field,
     FieldDescriptorProto::Label label;
     if (ParseLabel(&label, containing_file)) {
       field->set_label(label);
+      if (label == FieldDescriptorProto::LABEL_OPTIONAL &&
+          syntax_identifier_ == "proto3") {
+        AddError(
+            "Explicit 'optional' labels are disallowed in the Proto3 syntax. "
+            "To define 'optional' fields in Proto3, simply remove the "
+            "'optional' label, as fields are 'optional' by default.");
+      }
     }
   }
 
@@ -928,6 +938,42 @@ void Parser::GenerateMapEntry(const MapField& map_field,
     value_field->set_type(map_field.value_type);
   } else {
     value_field->set_type_name(map_field.value_type_name);
+  }
+  // Propagate the "enforce_utf8" option to key and value fields if they
+  // are strings. This helps simplify the implementation of code generators
+  // and also reflection-based parsing code.
+  //
+  // The following definition:
+  //   message Foo {
+  //     map<string, string> value = 1 [enforce_utf8 = false];
+  //   }
+  // will be interpreted as:
+  //   message Foo {
+  //     message ValueEntry {
+  //       option map_entry = true;
+  //       string key = 1 [enforce_utf8 = false];
+  //       string value = 2 [enforce_utf8 = false];
+  //     }
+  //     repeated ValueEntry value = 1 [enforce_utf8 = false];
+  //  }
+  //
+  // TODO(xiaofeng): Remove this when the "enforce_utf8" option is removed
+  // from protocol compiler.
+  for (int i = 0; i < field->options().uninterpreted_option_size(); ++i) {
+    const UninterpretedOption& option =
+        field->options().uninterpreted_option(i);
+    if (option.name_size() == 1 &&
+        option.name(0).name_part() == "enforce_utf8" &&
+        !option.name(0).is_extension()) {
+      if (key_field->type() == FieldDescriptorProto::TYPE_STRING) {
+        key_field->mutable_options()->add_uninterpreted_option()
+            ->CopyFrom(option);
+      }
+      if (value_field->type() == FieldDescriptorProto::TYPE_STRING) {
+        value_field->mutable_options()->add_uninterpreted_option()
+            ->CopyFrom(option);
+      }
+    }
   }
 }
 
@@ -1350,6 +1396,77 @@ bool Parser::ParseExtensions(DescriptorProto* message,
   } while (TryConsume(","));
 
   DO(ConsumeEndOfDeclaration(";", &extensions_location));
+  return true;
+}
+
+// This is similar to extension range parsing, except that "max" is not
+// supported, and accepts field name literals.
+bool Parser::ParseReserved(DescriptorProto* message,
+                           const LocationRecorder& message_location) {
+  // Parse the declaration.
+  DO(Consume("reserved"));
+  if (LookingAtType(io::Tokenizer::TYPE_STRING)) {
+    LocationRecorder location(message_location,
+                              DescriptorProto::kReservedNameFieldNumber);
+    return ParseReservedNames(message, location);
+  } else {
+    LocationRecorder location(message_location,
+                              DescriptorProto::kReservedRangeFieldNumber);
+    return ParseReservedNumbers(message, location);
+  }
+}
+
+
+bool Parser::ParseReservedNames(DescriptorProto* message,
+                                const LocationRecorder& parent_location) {
+  do {
+    LocationRecorder location(parent_location, message->reserved_name_size());
+    DO(ConsumeString(message->add_reserved_name(), "Expected field name."));
+  } while (TryConsume(","));
+  DO(ConsumeEndOfDeclaration(";", &parent_location));
+  return true;
+}
+
+bool Parser::ParseReservedNumbers(DescriptorProto* message,
+                                  const LocationRecorder& parent_location) {
+  bool first = true;
+  do {
+    LocationRecorder location(parent_location, message->reserved_range_size());
+
+    DescriptorProto::ReservedRange* range = message->add_reserved_range();
+    int start, end;
+    io::Tokenizer::Token start_token;
+    {
+      LocationRecorder start_location(
+          location, DescriptorProto::ReservedRange::kStartFieldNumber);
+      start_token = input_->current();
+      DO(ConsumeInteger(&start, (first ?
+                                 "Expected field name or number range." :
+                                 "Expected field number range.")));
+    }
+
+    if (TryConsume("to")) {
+      LocationRecorder end_location(
+          location, DescriptorProto::ReservedRange::kEndFieldNumber);
+      DO(ConsumeInteger(&end, "Expected integer."));
+    } else {
+      LocationRecorder end_location(
+          location, DescriptorProto::ReservedRange::kEndFieldNumber);
+      end_location.StartAt(start_token);
+      end_location.EndAt(start_token);
+      end = start;
+    }
+
+    // Users like to specify inclusive ranges, but in code we like the end
+    // number to be exclusive.
+    ++end;
+
+    range->set_start(start);
+    range->set_end(end);
+    first = false;
+  } while (TryConsume(","));
+
+  DO(ConsumeEndOfDeclaration(";", &parent_location));
   return true;
 }
 

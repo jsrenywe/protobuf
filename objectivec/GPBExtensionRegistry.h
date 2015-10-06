@@ -31,16 +31,37 @@
 #import <Foundation/Foundation.h>
 
 @class GPBDescriptor;
-@class GPBExtensionField;
+@class GPBExtensionDescriptor;
+
+NS_ASSUME_NONNULL_BEGIN
 
 // A table of known extensions, searchable by name or field number.  When
 // parsing a protocol message that might have extensions, you must provide an
 // ExtensionRegistry in which you have registered any extensions that you want
 // to be able to parse.  Otherwise, those extensions will just be treated like
 // unknown fields.
-@interface GPBExtensionRegistry : NSObject
+//
+// The *Root classes provide +extensionRegistry for the extensions defined in a
+// given file *and* all files it imports.  You can also create a
+// GPBExtensionRegistry, and merge those registries to handle parsing extensions
+// defined from non overlapping files.
+//
+//    GPBExtensionRegistry *registry =
+//        [[[MyProtoFileRoot extensionRegistry] copy] autorelease];
+//    [registry addExtension:[OtherMessage neededExtension];  // Not in MyProtoFile
+//    NSError *parseError = nil;
+//    MyMessage *msg = [MyMessage parseData:data
+//                        extensionRegistry:registry
+//                                    error:&parseError];
+//
+@interface GPBExtensionRegistry : NSObject<NSCopying>
 
-- (GPBExtensionField *)getExtension:(GPBDescriptor *)containingType
-                        fieldNumber:(NSInteger)fieldNumber;
+- (void)addExtension:(GPBExtensionDescriptor *)extension;
+- (void)addExtensions:(GPBExtensionRegistry *)registry;
+
+- (nullable GPBExtensionDescriptor *)extensionForDescriptor:(GPBDescriptor *)descriptor
+                                                fieldNumber:(NSInteger)fieldNumber;
 
 @end
+
+NS_ASSUME_NONNULL_END

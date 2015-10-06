@@ -36,14 +36,11 @@
 
 #import "google/protobuf/MapProto2Unittest.pbobjc.h"
 #import "google/protobuf/MapUnittest.pbobjc.h"
+#import "google/protobuf/Unittest.pbobjc.h"
 #import "google/protobuf/UnittestDropUnknownFields.pbobjc.h"
 #import "google/protobuf/UnittestPreserveUnknownEnum.pbobjc.h"
 #import "google/protobuf/UnittestRuntimeProto2.pbobjc.h"
 #import "google/protobuf/UnittestRuntimeProto3.pbobjc.h"
-
-#ifndef GPBARRAYSIZE
-#define GPBARRAYSIZE(a) ((sizeof(a) / sizeof((a[0]))))
-#endif  // GPBARRAYSIZE
 
 static NSData *DataFromCStr(const char *str) {
   return [NSData dataWithBytes:str length:strlen(str)];
@@ -124,7 +121,8 @@ static NSData *DataFromCStr(const char *str) {
   fooWithExtras.enumValue = DropUnknownsFooWithExtraFields_NestedEnum_Baz;
   fooWithExtras.extraInt32Value = 2;
 
-  DropUnknownsFoo *foo = [DropUnknownsFoo parseFromData:[fooWithExtras data]];
+  DropUnknownsFoo *foo =
+      [DropUnknownsFoo parseFromData:[fooWithExtras data] error:NULL];
 
   XCTAssertEqual(foo.int32Value, 1);
   XCTAssertEqual(foo.enumValue, DropUnknownsFoo_NestedEnum_Baz);
@@ -132,7 +130,8 @@ static NSData *DataFromCStr(const char *str) {
   XCTAssertEqual([foo.unknownFields countOfFields], 0U);
 
   [fooWithExtras release];
-  fooWithExtras = [DropUnknownsFooWithExtraFields parseFromData:[foo data]];
+  fooWithExtras =
+      [DropUnknownsFooWithExtraFields parseFromData:[foo data] error:NULL];
   XCTAssertEqual(fooWithExtras.int32Value, 1);
   XCTAssertEqual(fooWithExtras.enumValue,
                  DropUnknownsFooWithExtraFields_NestedEnum_Baz);
@@ -148,46 +147,35 @@ static NSData *DataFromCStr(const char *str) {
   orig.repeatedEnumArray =
       [GPBEnumArray arrayWithValidationFunction:Message3_Enum_IsValidValue
                                        rawValue:Message3_Enum_Extra3];
-  orig.repeatedPackedEnumArray =
-      [GPBEnumArray arrayWithValidationFunction:Message3_Enum_IsValidValue
-                                       rawValue:Message3_Enum_Extra3];
   orig.oneofEnum = Message3_Enum_Extra3;
 
-  Message2 *msg = [[Message2 alloc] initWithData:[orig data]];
+  Message2 *msg = [[Message2 alloc] initWithData:[orig data] error:NULL];
 
   // None of the fields should be set.
 
   XCTAssertFalse(msg.hasOptionalEnum);
   XCTAssertEqual(msg.repeatedEnumArray.count, 0U);
-  XCTAssertEqual(msg.repeatedPackedEnumArray.count, 0U);
   XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_GPBUnsetOneOfCase);
 
   // All the values should be in unknown fields.
 
   GPBUnknownFieldSet *unknownFields = msg.unknownFields;
 
-  XCTAssertEqual([unknownFields countOfFields], 4U);
+  XCTAssertEqual([unknownFields countOfFields], 3U);
   XCTAssertTrue([unknownFields hasField:Message2_FieldNumber_OptionalEnum]);
   XCTAssertTrue(
       [unknownFields hasField:Message2_FieldNumber_RepeatedEnumArray]);
-  XCTAssertTrue(
-      [unknownFields hasField:Message2_FieldNumber_RepeatedPackedEnumArray]);
   XCTAssertTrue([unknownFields hasField:Message2_FieldNumber_OneofEnum]);
 
-  GPBField *field = [unknownFields getField:Message2_FieldNumber_OptionalEnum];
+  GPBUnknownField *field =
+      [unknownFields getField:Message2_FieldNumber_OptionalEnum];
   XCTAssertEqual(field.varintList.count, 1U);
   XCTAssertEqual([field.varintList valueAtIndex:0],
                  (uint64_t)Message3_Enum_Extra3);
 
   field = [unknownFields getField:Message2_FieldNumber_RepeatedEnumArray];
   XCTAssertEqual(field.varintList.count, 1U);
-  XCTAssertEqual([field.varintList valueAtIndex:0],
-                 (uint64_t)Message3_Enum_Extra3);
-
-  field = [unknownFields getField:Message2_FieldNumber_RepeatedPackedEnumArray];
-  XCTAssertEqual(field.varintList.count, 1U);
-  XCTAssertEqual([field.varintList valueAtIndex:0],
-                 (uint64_t)Message3_Enum_Extra3);
+  XCTAssertEqual([field.varintList valueAtIndex:0], (uint64_t)Message3_Enum_Extra3);
 
   field = [unknownFields getField:Message2_FieldNumber_OneofEnum];
   XCTAssertEqual(field.varintList.count, 1U);
@@ -214,7 +202,7 @@ static NSData *DataFromCStr(const char *str) {
   // Everything should be there via raw values.
 
   UnknownEnumsMyMessage *msg =
-      [UnknownEnumsMyMessage parseFromData:[orig data]];
+      [UnknownEnumsMyMessage parseFromData:[orig data] error:NULL];
 
   XCTAssertEqual(msg.e, UnknownEnumsMyEnum_GPBUnrecognizedEnumeratorValue);
   XCTAssertEqual(UnknownEnumsMyMessage_E_RawValue(msg),
@@ -236,7 +224,7 @@ static NSData *DataFromCStr(const char *str) {
 
   // Everything should go out and come back.
 
-  orig = [UnknownEnumsMyMessagePlusExtra parseFromData:[msg data]];
+  orig = [UnknownEnumsMyMessagePlusExtra parseFromData:[msg data] error:NULL];
 
   XCTAssertEqual(orig.e, UnknownEnumsMyEnumPlusExtra_EExtra);
   XCTAssertEqual(orig.repeatedEArray.count, 1U);
@@ -255,7 +243,7 @@ static NSData *DataFromCStr(const char *str) {
 //%    MESSAGE *orig = [[MESSAGE alloc] init];
 //%    orig.oneof##FIELD = VALUE;
 //%    XCTAssertEqual(orig.oOneOfCase, MESSAGE##_O_OneOfCase_Oneof##FIELD);
-//%    MESSAGE *msg = [MESSAGE parseFromData:[orig data]];
+//%    MESSAGE *msg = [MESSAGE parseFromData:[orig data] error:NULL];
 //%    XCTAssertEqual(msg.oOneOfCase, MESSAGE##_O_OneOfCase_Oneof##FIELD);
 //%    XCTAssertEqual##EQ_SUFFIX(msg.oneof##FIELD, VALUE);
 //%    [orig release];
@@ -323,7 +311,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofInt32 = 1;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofInt32);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofInt32);
     XCTAssertEqual(msg.oneofInt32, 1);
     [orig release];
@@ -333,7 +321,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofInt64 = 2;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofInt64);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofInt64);
     XCTAssertEqual(msg.oneofInt64, 2);
     [orig release];
@@ -343,7 +331,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofUint32 = 3U;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofUint32);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofUint32);
     XCTAssertEqual(msg.oneofUint32, 3U);
     [orig release];
@@ -353,7 +341,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofUint64 = 4U;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofUint64);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofUint64);
     XCTAssertEqual(msg.oneofUint64, 4U);
     [orig release];
@@ -363,7 +351,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofSint32 = 5;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofSint32);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofSint32);
     XCTAssertEqual(msg.oneofSint32, 5);
     [orig release];
@@ -373,7 +361,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofSint64 = 6;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofSint64);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofSint64);
     XCTAssertEqual(msg.oneofSint64, 6);
     [orig release];
@@ -383,7 +371,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofFixed32 = 7U;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofFixed32);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofFixed32);
     XCTAssertEqual(msg.oneofFixed32, 7U);
     [orig release];
@@ -393,7 +381,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofFixed64 = 8U;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofFixed64);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofFixed64);
     XCTAssertEqual(msg.oneofFixed64, 8U);
     [orig release];
@@ -403,7 +391,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofSfixed32 = 9;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofSfixed32);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofSfixed32);
     XCTAssertEqual(msg.oneofSfixed32, 9);
     [orig release];
@@ -413,7 +401,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofSfixed64 = 10;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofSfixed64);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofSfixed64);
     XCTAssertEqual(msg.oneofSfixed64, 10);
     [orig release];
@@ -423,7 +411,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofFloat = 11.0f;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofFloat);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofFloat);
     XCTAssertEqual(msg.oneofFloat, 11.0f);
     [orig release];
@@ -433,7 +421,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofDouble = 12.0;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofDouble);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofDouble);
     XCTAssertEqual(msg.oneofDouble, 12.0);
     [orig release];
@@ -443,7 +431,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofBool = NO;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofBool);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofBool);
     XCTAssertEqual(msg.oneofBool, NO);
     [orig release];
@@ -453,7 +441,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofString = @"foo";
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofString);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofString);
     XCTAssertEqualObjects(msg.oneofString, @"foo");
     [orig release];
@@ -463,7 +451,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofBytes = [@"bar" dataUsingEncoding:NSUTF8StringEncoding];
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofBytes);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofBytes);
     XCTAssertEqualObjects(msg.oneofBytes, [@"bar" dataUsingEncoding:NSUTF8StringEncoding]);
     [orig release];
@@ -473,7 +461,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofGroup = group;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofGroup);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofGroup);
     XCTAssertEqualObjects(msg.oneofGroup, group);
     [orig release];
@@ -483,7 +471,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofMessage = subMessage;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofMessage);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofMessage);
     XCTAssertEqualObjects(msg.oneofMessage, subMessage);
     [orig release];
@@ -493,7 +481,7 @@ static NSData *DataFromCStr(const char *str) {
     Message2 *orig = [[Message2 alloc] init];
     orig.oneofEnum = Message2_Enum_Bar;
     XCTAssertEqual(orig.oOneOfCase, Message2_O_OneOfCase_OneofEnum);
-    Message2 *msg = [Message2 parseFromData:[orig data]];
+    Message2 *msg = [Message2 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_OneofEnum);
     XCTAssertEqual(msg.oneofEnum, Message2_Enum_Bar);
     [orig release];
@@ -516,7 +504,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofInt32 = 1;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofInt32);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofInt32);
     XCTAssertEqual(msg.oneofInt32, 1);
     [orig release];
@@ -526,7 +514,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofInt64 = 2;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofInt64);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofInt64);
     XCTAssertEqual(msg.oneofInt64, 2);
     [orig release];
@@ -536,7 +524,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofUint32 = 3U;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofUint32);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofUint32);
     XCTAssertEqual(msg.oneofUint32, 3U);
     [orig release];
@@ -546,7 +534,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofUint64 = 4U;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofUint64);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofUint64);
     XCTAssertEqual(msg.oneofUint64, 4U);
     [orig release];
@@ -556,7 +544,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofSint32 = 5;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofSint32);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofSint32);
     XCTAssertEqual(msg.oneofSint32, 5);
     [orig release];
@@ -566,7 +554,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofSint64 = 6;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofSint64);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofSint64);
     XCTAssertEqual(msg.oneofSint64, 6);
     [orig release];
@@ -576,7 +564,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofFixed32 = 7U;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofFixed32);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofFixed32);
     XCTAssertEqual(msg.oneofFixed32, 7U);
     [orig release];
@@ -586,7 +574,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofFixed64 = 8U;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofFixed64);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofFixed64);
     XCTAssertEqual(msg.oneofFixed64, 8U);
     [orig release];
@@ -596,7 +584,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofSfixed32 = 9;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofSfixed32);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofSfixed32);
     XCTAssertEqual(msg.oneofSfixed32, 9);
     [orig release];
@@ -606,7 +594,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofSfixed64 = 10;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofSfixed64);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofSfixed64);
     XCTAssertEqual(msg.oneofSfixed64, 10);
     [orig release];
@@ -616,7 +604,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofFloat = 11.0f;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofFloat);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofFloat);
     XCTAssertEqual(msg.oneofFloat, 11.0f);
     [orig release];
@@ -626,7 +614,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofDouble = 12.0;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofDouble);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofDouble);
     XCTAssertEqual(msg.oneofDouble, 12.0);
     [orig release];
@@ -636,7 +624,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofBool = YES;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofBool);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofBool);
     XCTAssertEqual(msg.oneofBool, YES);
     [orig release];
@@ -646,7 +634,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofString = @"foo";
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofString);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofString);
     XCTAssertEqualObjects(msg.oneofString, @"foo");
     [orig release];
@@ -656,7 +644,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofBytes = [@"bar" dataUsingEncoding:NSUTF8StringEncoding];
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofBytes);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofBytes);
     XCTAssertEqualObjects(msg.oneofBytes, [@"bar" dataUsingEncoding:NSUTF8StringEncoding]);
     [orig release];
@@ -668,7 +656,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofMessage = subMessage;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofMessage);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofMessage);
     XCTAssertEqualObjects(msg.oneofMessage, subMessage);
     [orig release];
@@ -678,7 +666,7 @@ static NSData *DataFromCStr(const char *str) {
     Message3 *orig = [[Message3 alloc] init];
     orig.oneofEnum = Message2_Enum_Bar;
     XCTAssertEqual(orig.oOneOfCase, Message3_O_OneOfCase_OneofEnum);
-    Message3 *msg = [Message3 parseFromData:[orig data]];
+    Message3 *msg = [Message3 parseFromData:[orig data] error:NULL];
     XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofEnum);
     XCTAssertEqual(msg.oneofEnum, Message2_Enum_Bar);
     [orig release];
@@ -689,13 +677,138 @@ static NSData *DataFromCStr(const char *str) {
 
 //%PDDM-EXPAND-END (2 expansions)
 
+- (void)testPackedUnpackedMessageParsing {
+  // packed is optional, a repeated field should parse when packed or unpacked.
+
+  TestPackedTypes *packedOrig = [TestPackedTypes message];
+  TestUnpackedTypes *unpackedOrig = [TestUnpackedTypes message];
+  [self setPackedFields:packedOrig repeatedCount:4];
+  [self setUnpackedFields:unpackedOrig repeatedCount:4];
+
+  NSData *packedData = [packedOrig data];
+  NSData *unpackedData = [unpackedOrig data];
+  XCTAssertNotNil(packedData);
+  XCTAssertNotNil(unpackedData);
+  XCTAssertNotEqualObjects(packedData, unpackedData,
+                           @"Data should differ (packed vs unpacked) use");
+
+  NSError *error = nil;
+  TestPackedTypes *packedParse =
+      [TestPackedTypes parseFromData:unpackedData error:&error];
+  XCTAssertNotNil(packedParse);
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(packedParse, packedOrig);
+
+  error = nil;
+  TestUnpackedTypes *unpackedParsed =
+      [TestUnpackedTypes parseFromData:packedData error:&error];
+  XCTAssertNotNil(unpackedParsed);
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(unpackedParsed, unpackedOrig);
+}
+
+- (void)testPackedUnpackedExtensionParsing {
+  // packed is optional, a repeated extension should parse when packed or
+  // unpacked.
+
+  TestPackedExtensions *packedOrig = [TestPackedExtensions message];
+  TestUnpackedExtensions *unpackedOrig = [TestUnpackedExtensions message];
+  [self setPackedExtensions:packedOrig repeatedCount:kGPBDefaultRepeatCount];
+  [self setUnpackedExtensions:unpackedOrig repeatedCount:kGPBDefaultRepeatCount];
+
+  NSData *packedData = [packedOrig data];
+  NSData *unpackedData = [unpackedOrig data];
+  XCTAssertNotNil(packedData);
+  XCTAssertNotNil(unpackedData);
+  XCTAssertNotEqualObjects(packedData, unpackedData,
+                           @"Data should differ (packed vs unpacked) use");
+
+  NSError *error = nil;
+  TestPackedExtensions *packedParse =
+      [TestPackedExtensions parseFromData:unpackedData
+                        extensionRegistry:[UnittestRoot extensionRegistry]
+                                    error:&error];
+  XCTAssertNotNil(packedParse);
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(packedParse, packedOrig);
+
+  error = nil;
+  TestUnpackedExtensions *unpackedParsed =
+      [TestUnpackedExtensions parseFromData:packedData
+                          extensionRegistry:[UnittestRoot extensionRegistry]
+                                      error:&error];
+  XCTAssertNotNil(unpackedParsed);
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(unpackedParsed, unpackedOrig);
+}
+
+- (void)testPackedExtensionVsFieldParsing {
+  // Extensions and fields end up on the wire the same way, so they can parse
+  // each other.
+
+  TestPackedTypes *fieldsOrig = [TestPackedTypes message];
+  TestPackedExtensions *extsOrig = [TestPackedExtensions message];
+  [self setPackedFields:fieldsOrig repeatedCount:kGPBDefaultRepeatCount];
+  [self setPackedExtensions:extsOrig repeatedCount:kGPBDefaultRepeatCount];
+
+  NSData *fieldsData = [fieldsOrig data];
+  NSData *extsData = [extsOrig data];
+  XCTAssertNotNil(fieldsData);
+  XCTAssertNotNil(extsData);
+  XCTAssertEqualObjects(fieldsData, extsData);
+
+  NSError *error = nil;
+  TestPackedTypes *fieldsParse =
+      [TestPackedTypes parseFromData:extsData error:&error];
+  XCTAssertNotNil(fieldsParse);
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(fieldsParse, fieldsOrig);
+
+  error = nil;
+  TestPackedExtensions *extsParse =
+      [TestPackedExtensions parseFromData:fieldsData
+                        extensionRegistry:[UnittestRoot extensionRegistry]
+                                    error:&error];
+  XCTAssertNotNil(extsParse);
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(extsParse, extsOrig);
+}
+
+- (void)testUnpackedExtensionVsFieldParsing {
+  // Extensions and fields end up on the wire the same way, so they can parse
+  // each other.
+
+  TestUnpackedTypes *fieldsOrig = [TestUnpackedTypes message];
+  TestUnpackedExtensions *extsOrig = [TestUnpackedExtensions message];
+  [self setUnpackedFields:fieldsOrig repeatedCount:3];
+  [self setUnpackedExtensions:extsOrig repeatedCount:3];
+
+  NSData *fieldsData = [fieldsOrig data];
+  NSData *extsData = [extsOrig data];
+  XCTAssertNotNil(fieldsData);
+  XCTAssertNotNil(extsData);
+  XCTAssertEqualObjects(fieldsData, extsData);
+
+  TestUnpackedTypes *fieldsParse =
+      [TestUnpackedTypes parseFromData:extsData error:NULL];
+  XCTAssertNotNil(fieldsParse);
+  XCTAssertEqualObjects(fieldsParse, fieldsOrig);
+
+  TestUnpackedExtensions *extsParse =
+      [TestUnpackedExtensions parseFromData:fieldsData
+                          extensionRegistry:[UnittestRoot extensionRegistry]
+                                      error:NULL];
+  XCTAssertNotNil(extsParse);
+  XCTAssertEqualObjects(extsParse, extsOrig);
+}
+
 #pragma mark - Subset from from map_tests.cc
 
 // TEST(GeneratedMapFieldTest, StandardWireFormat)
 - (void)testMap_StandardWireFormat {
   NSData *data = DataFromCStr("\x0A\x04\x08\x01\x10\x01");
 
-  TestMap *msg = [[TestMap alloc] initWithData:data];
+  TestMap *msg = [[TestMap alloc] initWithData:data error:NULL];
   XCTAssertEqual(msg.mapInt32Int32.count, 1U);
   int32_t val = 666;
   XCTAssertTrue([msg.mapInt32Int32 valueForKey:1 value:&val]);
@@ -709,7 +822,7 @@ static NSData *DataFromCStr(const char *str) {
   // put value before key in wire format
   NSData *data = DataFromCStr("\x0A\x04\x10\x01\x08\x02");
 
-  TestMap *msg = [[TestMap alloc] initWithData:data];
+  TestMap *msg = [[TestMap alloc] initWithData:data error:NULL];
   XCTAssertEqual(msg.mapInt32Int32.count, 1U);
   int32_t val = 666;
   XCTAssertTrue([msg.mapInt32Int32 valueForKey:2 value:&val]);
@@ -723,7 +836,7 @@ static NSData *DataFromCStr(const char *str) {
   // Two key fields in wire format
   NSData *data = DataFromCStr("\x0A\x06\x08\x01\x08\x02\x10\x01");
 
-  TestMap *msg = [[TestMap alloc] initWithData:data];
+  TestMap *msg = [[TestMap alloc] initWithData:data error:NULL];
   XCTAssertEqual(msg.mapInt32Int32.count, 1U);
   int32_t val = 666;
   XCTAssertTrue([msg.mapInt32Int32 valueForKey:2 value:&val]);
@@ -737,7 +850,7 @@ static NSData *DataFromCStr(const char *str) {
   // Two value fields in wire format
   NSData *data = DataFromCStr("\x0A\x06\x08\x01\x10\x01\x10\x02");
 
-  TestMap *msg = [[TestMap alloc] initWithData:data];
+  TestMap *msg = [[TestMap alloc] initWithData:data error:NULL];
   XCTAssertEqual(msg.mapInt32Int32.count, 1U);
   int32_t val = 666;
   XCTAssertTrue([msg.mapInt32Int32 valueForKey:1 value:&val]);
@@ -751,7 +864,7 @@ static NSData *DataFromCStr(const char *str) {
   // No key field in wire format
   NSData *data = DataFromCStr("\x0A\x02\x10\x01");
 
-  TestMap *msg = [[TestMap alloc] initWithData:data];
+  TestMap *msg = [[TestMap alloc] initWithData:data error:NULL];
   XCTAssertEqual(msg.mapInt32Int32.count, 1U);
   int32_t val = 666;
   XCTAssertTrue([msg.mapInt32Int32 valueForKey:0 value:&val]);
@@ -765,7 +878,7 @@ static NSData *DataFromCStr(const char *str) {
   // No value field in wire format
   NSData *data = DataFromCStr("\x0A\x02\x08\x01");
 
-  TestMap *msg = [[TestMap alloc] initWithData:data];
+  TestMap *msg = [[TestMap alloc] initWithData:data error:NULL];
   XCTAssertEqual(msg.mapInt32Int32.count, 1U);
   int32_t val = 666;
   XCTAssertTrue([msg.mapInt32Int32 valueForKey:1 value:&val]);
@@ -779,7 +892,7 @@ static NSData *DataFromCStr(const char *str) {
   // Unknown field in wire format
   NSData *data = DataFromCStr("\x0A\x06\x08\x02\x10\x03\x18\x01");
 
-  TestMap *msg = [[TestMap alloc] initWithData:data];
+  TestMap *msg = [[TestMap alloc] initWithData:data error:NULL];
   XCTAssertEqual(msg.mapInt32Int32.count, 1U);
   int32_t val = 666;
   XCTAssertTrue([msg.mapInt32Int32 valueForKey:2 value:&val]);
@@ -793,8 +906,12 @@ static NSData *DataFromCStr(const char *str) {
   // corrupted data in wire format
   NSData *data = DataFromCStr("\x0A\x06\x08\x02\x11\x03");
 
-  XCTAssertThrowsSpecificNamed([TestMap parseFromData:data], NSException,
-                               NSParseErrorException);
+  NSError *error = nil;
+  TestMap *msg = [TestMap parseFromData:data error:&error];
+  XCTAssertNil(msg);
+  XCTAssertNotNil(error);
+  XCTAssertEqualObjects(error.domain, GPBMessageErrorDomain);
+  XCTAssertEqual(error.code, GPBMessageErrorCodeMalformedData);
 }
 
 // TEST(GeneratedMapFieldTest, Proto2UnknownEnum)
@@ -810,14 +927,15 @@ static NSData *DataFromCStr(const char *str) {
   [orig.unknownMapField setValue:Proto2MapEnumPlusExtra_EProto2MapEnumExtra
                           forKey:0];
 
-  TestEnumMap *msg1 = [TestEnumMap parseFromData:[orig data]];
+  TestEnumMap *msg1 = [TestEnumMap parseFromData:[orig data] error:NULL];
   XCTAssertEqual(msg1.knownMapField.count, 1U);
   int32_t val = -1;
   XCTAssertTrue([msg1.knownMapField valueForKey:0 value:&val]);
   XCTAssertEqual(val, Proto2MapEnum_Proto2MapEnumFoo);
   XCTAssertEqual(msg1.unknownFields.countOfFields, 1U);
 
-  TestEnumMapPlusExtra *msg2 = [TestEnumMapPlusExtra parseFromData:[msg1 data]];
+  TestEnumMapPlusExtra *msg2 =
+      [TestEnumMapPlusExtra parseFromData:[msg1 data] error:NULL];
   val = -1;
   XCTAssertEqual(msg2.knownMapField.count, 1U);
   XCTAssertTrue([msg2.knownMapField valueForKey:0 value:&val]);
@@ -833,6 +951,72 @@ static NSData *DataFromCStr(const char *str) {
   [orig release];
 }
 
-#pragma mark -
+#pragma mark - Map Round Tripping
+
+- (void)testProto2MapRoundTripping {
+  Message2 *msg = [[Message2 alloc] init];
+
+  // Key/Value data should result in different byte lengths on wire to ensure
+  // everything is right.
+  [msg.mapInt32Int32 setValue:1000 forKey:200];
+  [msg.mapInt32Int32 setValue:101 forKey:2001];
+  [msg.mapInt64Int64 setValue:1002 forKey:202];
+  [msg.mapInt64Int64 setValue:103 forKey:2003];
+  [msg.mapUint32Uint32 setValue:1004 forKey:204];
+  [msg.mapUint32Uint32 setValue:105 forKey:2005];
+  [msg.mapUint64Uint64 setValue:1006 forKey:206];
+  [msg.mapUint64Uint64 setValue:107 forKey:2007];
+  [msg.mapSint32Sint32 setValue:1008 forKey:208];
+  [msg.mapSint32Sint32 setValue:109 forKey:2009];
+  [msg.mapSint64Sint64 setValue:1010 forKey:210];
+  [msg.mapSint64Sint64 setValue:111 forKey:2011];
+  [msg.mapFixed32Fixed32 setValue:1012 forKey:212];
+  [msg.mapFixed32Fixed32 setValue:113 forKey:2013];
+  [msg.mapFixed64Fixed64 setValue:1014 forKey:214];
+  [msg.mapFixed64Fixed64 setValue:115 forKey:2015];
+  [msg.mapSfixed32Sfixed32 setValue:1016 forKey:216];
+  [msg.mapSfixed32Sfixed32 setValue:117 forKey:2017];
+  [msg.mapSfixed64Sfixed64 setValue:1018 forKey:218];
+  [msg.mapSfixed64Sfixed64 setValue:119 forKey:2019];
+  [msg.mapInt32Float setValue:1020.f forKey:220];
+  [msg.mapInt32Float setValue:121.f forKey:2021];
+  [msg.mapInt32Double setValue:1022. forKey:222];
+  [msg.mapInt32Double setValue:123. forKey:2023];
+  [msg.mapBoolBool setValue:false forKey:true];
+  [msg.mapBoolBool setValue:true forKey:false];
+  msg.mapStringString[@"224"] = @"1024";
+  msg.mapStringString[@"2025"] = @"125";
+  msg.mapStringBytes[@"226"] = DataFromCStr("1026");
+  msg.mapStringBytes[@"2027"] = DataFromCStr("127");
+  Message2 *val1 = [[Message2 alloc] init];
+  val1.optionalInt32 = 1028;
+  Message2 *val2 = [[Message2 alloc] init];
+  val2.optionalInt32 = 129;
+  [msg.mapStringMessage setValue:val1 forKey:@"228"];
+  [msg.mapStringMessage setValue:val2 forKey:@"2029"];
+  [msg.mapInt32Bytes setObject:DataFromCStr("1030 bytes") forKey:230];
+  [msg.mapInt32Bytes setObject:DataFromCStr("131") forKey:2031];
+  [msg.mapInt32Enum setValue:Message2_Enum_Bar forKey:232];
+  [msg.mapInt32Enum setValue:Message2_Enum_Baz forKey:2033];
+  Message2 *val3 = [[Message2 alloc] init];
+  val3.optionalInt32 = 1034;
+  Message2 *val4 = [[Message2 alloc] init];
+  val4.optionalInt32 = 135;
+  [msg.mapInt32Message setObject:val3 forKey:234];
+  [msg.mapInt32Message setObject:val4 forKey:2035];
+
+  NSData *data = [msg data];
+  Message2 *msg2 = [[Message2 alloc] initWithData:data error:NULL];
+
+  XCTAssertNotEqual(msg2, msg);  // Pointer comparison
+  XCTAssertEqualObjects(msg2, msg);
+
+  [val4 release];
+  [val3 release];
+  [val2 release];
+  [val1 release];
+  [msg2 release];
+  [msg release];
+}
 
 @end

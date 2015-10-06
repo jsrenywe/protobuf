@@ -76,6 +76,11 @@ const char* PrimitiveTypeName(const FieldDescriptor* descriptor) {
     case OBJECTIVECTYPE_MESSAGE:
       return NULL;
   }
+
+  // Some compilers report reaching end of function even though all cases of
+  // the enum are handed in the switch.
+  GOOGLE_LOG(FATAL) << "Can't get here.";
+  return NULL;
 }
 
 const char* PrimitiveArrayTypeName(const FieldDescriptor* descriptor) {
@@ -104,6 +109,11 @@ const char* PrimitiveArrayTypeName(const FieldDescriptor* descriptor) {
     case OBJECTIVECTYPE_MESSAGE:
       return "";  // Want NSArray
   }
+
+  // Some compilers report reaching end of function even though all cases of
+  // the enum are handed in the switch.
+  GOOGLE_LOG(FATAL) << "Can't get here.";
+  return NULL;
 }
 
 void SetPrimitiveVariables(const FieldDescriptor* descriptor,
@@ -154,7 +164,6 @@ void RepeatedPrimitiveFieldGenerator::FinishInitialization(void) {
     variables_["array_comment"] = "";
   }
 }
-
 
 }  // namespace objectivec
 }  // namespace compiler

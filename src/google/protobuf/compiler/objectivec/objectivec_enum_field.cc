@@ -48,8 +48,13 @@ void SetEnumVariables(const FieldDescriptor* descriptor,
                       map<string, string>* variables) {
   string type = EnumName(descriptor->enum_type());
   (*variables)["storage_type"] = type;
-  // TODO(thomasvl): Make inclusion of descriptor compile time and output
-  // both of these. Note: Extensions currently have to have the EnumDescription.
+  // For non repeated fields, if it was defined in a different file, the
+  // property decls need to use "enum NAME" rather than just "NAME" to support
+  // the forward declaration of the enums.
+  if (!descriptor->is_repeated() &&
+      (descriptor->file() != descriptor->enum_type()->file())) {
+    (*variables)["property_type"] = "enum " + type;
+  }
   (*variables)["enum_verifier"] = type + "_IsValidValue";
   (*variables)["enum_desc_func"] = type + "_EnumDescriptor";
 
@@ -67,16 +72,16 @@ EnumFieldGenerator::~EnumFieldGenerator() {}
 
 void EnumFieldGenerator::GenerateFieldDescriptionTypeSpecific(
     io::Printer* printer) const {
-  // TODO(thomasvl): Output the CPP check to use descFunc or validator based
-  // on final compile.
   printer->Print(
       variables_,
-      "  .typeSpecific.enumDescFunc = $enum_desc_func$,\n");
+      "  .dataTypeSpecific.enumDescFunc = $enum_desc_func$,\n");
 }
 
 void EnumFieldGenerator::GenerateCFunctionDeclarations(
     io::Printer* printer) const {
-  if (!HasPreservingUnknownEnumSemantics(descriptor_->file())) return;
+  if (!HasPreservingUnknownEnumSemantics(descriptor_->file())) {
+    return;
+  }
 
   printer->Print(
       variables_,
@@ -94,7 +99,7 @@ void EnumFieldGenerator::GenerateCFunctionImplementations(
       "int32_t $owning_message_class$_$capitalized_name$_RawValue($owning_message_class$ *message) {\n"
       "  GPBDescriptor *descriptor = [$owning_message_class$ descriptor];\n"
       "  GPBFieldDescriptor *field = [descriptor fieldWithNumber:$field_number_name$];\n"
-      "  return GPBGetInt32IvarWithField(message, field);\n"
+      "  return GPBGetMessageInt32Field(message, field);\n"
       "}\n"
       "\n"
       "void Set$owning_message_class$_$capitalized_name$_RawValue($owning_message_class$ *message, int32_t value) {\n"
@@ -103,6 +108,18 @@ void EnumFieldGenerator::GenerateCFunctionImplementations(
       "  GPBSetInt32IvarWithFieldInternal(message, field, value, descriptor.file.syntax);\n"
       "}\n"
       "\n");
+}
+
+void EnumFieldGenerator::DetermineForwardDeclarations(
+    set<string>* fwd_decls) const {
+  // If it is an enum defined in a different file, then we'll need a forward
+  // declaration for it.  When it is in our file, all the enums are output
+  // before the message, so it will be declared before it is needed.
+  if (descriptor_->file() != descriptor_->enum_type()->file()) {
+    // Enum name is already in "storage_type".
+    const string& name = variable("storage_type");
+    fwd_decls->insert("GPB_ENUM_FWD_DECLARE(" + name + ")");
+  }
 }
 
 RepeatedEnumFieldGenerator::RepeatedEnumFieldGenerator(
@@ -116,11 +133,9 @@ RepeatedEnumFieldGenerator::~RepeatedEnumFieldGenerator() {}
 
 void RepeatedEnumFieldGenerator::GenerateFieldDescriptionTypeSpecific(
     io::Printer* printer) const {
-  // TODO(thomasvl): Output the CPP check to use descFunc or validator based
-  // on final compile.
   printer->Print(
       variables_,
-      "  .typeSpecific.enumDescFunc = $enum_desc_func$,\n");
+      "  .dataTypeSpecific.enumDescFunc = $enum_desc_func$,\n");
 }
 
 }  // namespace objectivec

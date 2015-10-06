@@ -25,11 +25,11 @@ readonly ConstantName=GOOGLE_PROTOBUF_OBJC_GEN_VERSION
 readonly PluginSrc="${ProtoRootDir}/src/google/protobuf/compiler/objectivec/objectivec_file.cc"
 readonly PluginVersion=$( \
     cat "${PluginSrc}" \
-        | sed -n -e "s:const int32_t ${ConstantName} = \([0-9]*\);:\1:p"
+        | sed -n -e "s:const int32 ${ConstantName} = \([0-9]*\);:\1:p"
 )
 
 if [[ -z "${PluginVersion}" ]] ; then
-    die "Failed to fine ${ConstantName} in the plugin source (${PluginSrc})."
+    die "Failed to find ${ConstantName} in the plugin source (${PluginSrc})."
 fi
 
 # Collect version from runtime sources.
@@ -41,7 +41,7 @@ readonly RuntimeVersion=$( \
 )
 
 if [[ -z "${RuntimeVersion}" ]] ; then
-    die "Failed to fine ${ConstantName} in the runtime source (${RuntimeSrc})."
+    die "Failed to find ${ConstantName} in the runtime source (${RuntimeSrc})."
 fi
 
 # Compare them.

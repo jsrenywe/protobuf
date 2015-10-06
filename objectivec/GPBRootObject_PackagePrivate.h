@@ -32,11 +32,15 @@
 
 #import "GPBRootObject.h"
 
-@class GPBExtensionField;
+@class GPBExtensionDescriptor;
 
 @interface GPBRootObject ()
 
 // Globally register.
-+ (void)globallyRegisterExtension:(GPBExtensionField *)field;
++ (void)globallyRegisterExtension:(GPBExtensionDescriptor *)field;
 
 @end
+
+// Returns YES if the selector was resolved and added to the class,
+// NO otherwise.
+BOOL GPBResolveExtensionClassMethod(Class self, SEL sel);

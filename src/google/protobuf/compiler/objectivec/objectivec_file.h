@@ -64,8 +64,12 @@ class FileGenerator {
   const string& RootClassName() const { return root_class_name_; }
   const string Path() const;
 
-  bool IsFiltered() const { return is_filtered_; }
-  bool AreAllExtensionsFiltered() const { return all_extensions_filtered_; }
+  bool IsPublicDependency() const { return is_public_dep_; }
+
+ protected:
+  void SetIsPublicDependency(bool is_public_dep) {
+    is_public_dep_ = is_public_dep;
+  }
 
  private:
   const FileDescriptor* file_;
@@ -78,17 +82,16 @@ class FileGenerator {
   vector<EnumGenerator*> enum_generators_;
   vector<MessageGenerator*> message_generators_;
   vector<ExtensionGenerator*> extension_generators_;
-  bool is_filtered_;
-  bool all_extensions_filtered_;
-
-  void DetermineDependencies(set<string>* dependencies);
+  bool is_public_dep_;
 
   const vector<FileGenerator*>& DependencyGenerators();
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(FileGenerator);
 };
+
 }  // namespace objectivec
 }  // namespace compiler
 }  // namespace protobuf
 }  // namespace google
+
 #endif  // GOOGLE_PROTOBUF_COMPILER_OBJECTIVEC_FILE_H__

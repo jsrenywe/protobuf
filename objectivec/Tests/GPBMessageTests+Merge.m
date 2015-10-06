@@ -35,6 +35,7 @@
 #import "GPBMessage.h"
 
 #import "google/protobuf/MapUnittest.pbobjc.h"
+#import "google/protobuf/Unittest.pbobjc.h"
 #import "google/protobuf/UnittestPreserveUnknownEnum.pbobjc.h"
 #import "google/protobuf/UnittestRuntimeProto2.pbobjc.h"
 #import "google/protobuf/UnittestRuntimeProto3.pbobjc.h"
@@ -431,7 +432,7 @@
   XCTAssertNotNil(dst.oneofGroup);
   XCTAssertNotEqual(dst.oneofGroup, mergedGroup);  // Pointer comparision.
 
-  // Back to something else ot make sure message clears out ok.
+  // Back to something else to make sure message clears out ok.
 
   src.oneofInt32 = 10;
   [dst mergeFrom:src];
@@ -640,7 +641,7 @@
   XCTAssertEqualObjects(mergedSubMessage, subMessage);
   XCTAssertEqualObjects(dst.oneofBytes, oneofBytesDefault);
 
-  // Back to something else ot make sure message clears out ok.
+  // Back to something else to make sure message clears out ok.
 
   src.oneofInt32 = 10;
   [dst mergeFrom:src];
@@ -675,20 +676,21 @@
   TestAllTypes *subMsg = [TestAllTypes message];
   subMsg.repeatedInt32Array = [GPBInt32Array arrayWithValue:100];
   msg1.mapInt32Message = [GPBInt32ObjectDictionary dictionary];
-  [msg1.mapInt32Message setValue:subMsg forKey:0];
+  [msg1.mapInt32Message setObject:subMsg forKey:0];
   subMsg = nil;
 
   subMsg = [TestAllTypes message];
   subMsg.repeatedInt32Array = [GPBInt32Array arrayWithValue:101];
   msg2.mapInt32Message = [GPBInt32ObjectDictionary dictionary];
-  [msg2.mapInt32Message setValue:subMsg forKey:0];
+  
+  [msg2.mapInt32Message setObject:subMsg forKey:0];
   subMsg = nil;
 
   [msg1 mergeFrom:msg2];
 
   // Checks repeated field is overwritten.
   XCTAssertEqual(msg1.mapInt32Message.count, 1U);
-  subMsg = [msg1.mapInt32Message valueForKey:0];
+  subMsg = [msg1.mapInt32Message objectForKey:0];
   XCTAssertNotNil(subMsg);
   XCTAssertEqual(subMsg.repeatedInt32Array.count, 1U);
   XCTAssertEqual([subMsg.repeatedInt32Array valueAtIndex:0], 101);

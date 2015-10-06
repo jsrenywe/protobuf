@@ -1,25 +1,14 @@
 #! /usr/bin/env python
 #
 # See README for usage instructions.
-import sys
+import glob
 import os
 import subprocess
+import sys
 
 # We must use setuptools, not distutils, because we need to use the
 # namespace_packages option for the "google" package.
-try:
-  from setuptools import setup, Extension, find_packages
-except ImportError:
-  try:
-    from ez_setup import use_setuptools
-    use_setuptools()
-    from setuptools import setup, Extension, find_packages
-  except ImportError:
-    sys.stderr.write(
-        "Could not import setuptools; make sure you have setuptools or "
-        "ez_setup installed.\n"
-    )
-    raise
+from setuptools import setup, Extension, find_packages
 
 from distutils.command.clean import clean as _clean
 
@@ -57,10 +46,13 @@ def GetVersion():
     return __version__
 
 
-def generate_proto(source):
+def generate_proto(source, require = True):
   """Invokes the Protocol Compiler to generate a _pb2.py from the given
   .proto file.  Does nothing if the output already exists and is newer than
   the input."""
+
+  if not require and not os.path.exists(source):
+    return
 
   output = source.replace(".proto", "_pb2.py").replace("../src/", "")
 
@@ -75,36 +67,41 @@ def generate_proto(source):
 
     if protoc is None:
       sys.stderr.write(
-          "protoc is not installed nor found in ../src. "
-          "Please compile it or install the binary package.\n"
-      )
+          "protoc is not installed nor found in ../src.  Please compile it "
+          "or install the binary package.\n")
       sys.exit(-1)
 
-    protoc_command = [protoc, "-I../src", "-I.", "--python_out=.", source]
+    protoc_command = [ protoc, "-I../src", "-I.", "--python_out=.", source ]
     if subprocess.call(protoc_command) != 0:
       sys.exit(-1)
 
-
 def GenerateUnittestProtos():
-  generate_proto("../src/google/protobuf/unittest.proto")
-  generate_proto("../src/google/protobuf/unittest_custom_options.proto")
-  generate_proto("../src/google/protobuf/unittest_import.proto")
-  generate_proto("../src/google/protobuf/unittest_import_public.proto")
-  generate_proto("../src/google/protobuf/unittest_mset.proto")
-  generate_proto("../src/google/protobuf/unittest_no_generic_services.proto")
-  generate_proto("../src/google/protobuf/unittest_proto3_arena.proto")
-  generate_proto("google/protobuf/internal/descriptor_pool_test1.proto")
-  generate_proto("google/protobuf/internal/descriptor_pool_test2.proto")
-  generate_proto("google/protobuf/internal/factory_test1.proto")
-  generate_proto("google/protobuf/internal/factory_test2.proto")
-  generate_proto("google/protobuf/internal/import_test_package/inner.proto")
-  generate_proto("google/protobuf/internal/import_test_package/outer.proto")
-  generate_proto("google/protobuf/internal/missing_enum_values.proto")
-  generate_proto("google/protobuf/internal/more_extensions.proto")
-  generate_proto("google/protobuf/internal/more_extensions_dynamic.proto")
-  generate_proto("google/protobuf/internal/more_messages.proto")
-  generate_proto("google/protobuf/internal/test_bad_identifiers.proto")
-  generate_proto("google/protobuf/pyext/python.proto")
+  generate_proto("../src/google/protobuf/map_unittest.proto", False)
+  generate_proto("../src/google/protobuf/unittest_arena.proto", False)
+  generate_proto("../src/google/protobuf/unittest_no_arena.proto", False)
+  generate_proto("../src/google/protobuf/unittest_no_arena_import.proto", False)
+  generate_proto("../src/google/protobuf/unittest.proto", False)
+  generate_proto("../src/google/protobuf/unittest_custom_options.proto", False)
+  generate_proto("../src/google/protobuf/unittest_import.proto", False)
+  generate_proto("../src/google/protobuf/unittest_import_public.proto", False)
+  generate_proto("../src/google/protobuf/unittest_mset.proto", False)
+  generate_proto("../src/google/protobuf/unittest_mset_wire_format.proto", False)
+  generate_proto("../src/google/protobuf/unittest_no_generic_services.proto", False)
+  generate_proto("../src/google/protobuf/unittest_proto3_arena.proto", False)
+  generate_proto("google/protobuf/internal/descriptor_pool_test1.proto", False)
+  generate_proto("google/protobuf/internal/descriptor_pool_test2.proto", False)
+  generate_proto("google/protobuf/internal/factory_test1.proto", False)
+  generate_proto("google/protobuf/internal/factory_test2.proto", False)
+  generate_proto("google/protobuf/internal/import_test_package/inner.proto", False)
+  generate_proto("google/protobuf/internal/import_test_package/outer.proto", False)
+  generate_proto("google/protobuf/internal/missing_enum_values.proto", False)
+  generate_proto("google/protobuf/internal/message_set_extensions.proto", False)
+  generate_proto("google/protobuf/internal/more_extensions.proto", False)
+  generate_proto("google/protobuf/internal/more_extensions_dynamic.proto", False)
+  generate_proto("google/protobuf/internal/more_messages.proto", False)
+  generate_proto("google/protobuf/internal/packed_field_test.proto", False)
+  generate_proto("google/protobuf/internal/test_bad_identifiers.proto", False)
+  generate_proto("google/protobuf/pyext/python.proto", False)
 
 
 class clean(_clean):
@@ -114,12 +111,11 @@ class clean(_clean):
       for filename in filenames:
         filepath = os.path.join(dirpath, filename)
         if filepath.endswith("_pb2.py") or filepath.endswith(".pyc") or \
-           filepath.endswith(".so") or filepath.endswith(".o") or \
-           filepath.endswith('google/protobuf/compiler/__init__.py'):
+          filepath.endswith(".so") or filepath.endswith(".o") or \
+          filepath.endswith('google/protobuf/compiler/__init__.py'):
           os.remove(filepath)
     # _clean is an old-style class, so super() doesn't work.
     _clean.run(self)
-
 
 class build_py(_build_py):
   def run(self):
@@ -136,13 +132,7 @@ class build_py(_build_py):
         pass
     # _build_py is an old-style class, so super() doesn't work.
     _build_py.run(self)
-  # TODO(mrovner): Subclass to run 2to3 on some files only.
-  # Tracing what https://wiki.python.org/moin/PortingPythonToPy3k's
-  # "Approach 2" section on how to get 2to3 to run on source files during
-  # install under Python 3.  This class seems like a good place to put logic
-  # that calls python3's distutils.util.run_2to3 on the subset of the files we
-  # have in our release that are subject to conversion.
-  # See code reference in previous code review.
+
 
 if __name__ == '__main__':
   ext_module_list = []
@@ -153,15 +143,7 @@ if __name__ == '__main__':
     ext_module_list.append(
         Extension(
             "google.protobuf.pyext._message",
-            [
-                "google/protobuf/pyext/descriptor.cc",
-                "google/protobuf/pyext/descriptor_containers.cc",
-                "google/protobuf/pyext/descriptor_pool.cc",
-                "google/protobuf/pyext/extension_dict.cc",
-                "google/protobuf/pyext/message.cc",
-                "google/protobuf/pyext/repeated_composite_container.cc",
-                "google/protobuf/pyext/repeated_scalar_container.cc",
-            ],
+            glob.glob('google/protobuf/pyext/*.cc'),
             define_macros=[('GOOGLE_PROTOBUF_HAS_ONEOF', '1')],
             include_dirs=[".", "../src"],
             libraries=['protobuf'],
@@ -169,6 +151,12 @@ if __name__ == '__main__':
         )
     )
     os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'cpp'
+
+  # Keep this list of dependencies in sync with tox.ini.
+  install_requires = ['six', 'setuptools']
+  if sys.version_info <= (2,7):
+    install_requires.append('ordereddict')
+    install_requires.append('unittest2')
 
   setup(
       name='protobuf',
@@ -180,8 +168,14 @@ if __name__ == '__main__':
       maintainer_email='protobuf@googlegroups.com',
       license='New BSD License',
       classifiers=[
-          'Programming Language :: Python :: 2.7',
-      ],
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 2.6",
+        "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.3",
+        "Programming Language :: Python :: 3.4",
+        ],
       namespace_packages=['google'],
       packages=find_packages(
           exclude=[
@@ -193,6 +187,6 @@ if __name__ == '__main__':
           'clean': clean,
           'build_py': build_py,
       },
-      install_requires=['setuptools'],
+      install_requires=install_requires,
       ext_modules=ext_module_list,
   )

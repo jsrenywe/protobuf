@@ -28,15 +28,18 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <arpa/inet.h>
-#include <errno.h>
-#include <limits.h>
-#include <stdlib.h>
+#ifdef _MSC_VER
+#include <io.h>
+#else
 #include <unistd.h>
-
+#endif
+#include <climits>
+#include <errno.h>
+#include <fcntl.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <stdlib.h>
 #include <vector>
 
 #include <google/protobuf/stubs/hash.h>
@@ -44,18 +47,11 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/descriptor.pb.h>
+#include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/strutil.h>
 
-#ifndef htonl
-#include <netinet/in.h>
-#endif
-
-#ifndef O_EXLOCK
-#include <sys/file.h>
-#endif
-
 // NOTE: src/google/protobuf/compiler/plugin.cc makes use of cerr for some
-// error case, so it seem to be ok to use as a back door for errors.
+// error cases, so it seems to be ok to use as a back door for errors.
 
 namespace google {
 namespace protobuf {
@@ -63,43 +59,6 @@ namespace compiler {
 namespace objectivec {
 
 namespace {
-
-hash_set<string> gClassWhitelist;
-stringstream gClassListStream;
-
-// islower()/isupper()/tolower()/toupper() change based on locale.
-
-bool IsLower(const char c) {
-  return ('a' <= c && c <= 'z');
-}
-
-bool IsUpper(const char c) {
-  return ('A' <= c && c <= 'Z');
-}
-
-char ToLower(char c) {
-  if ('A' <= c && c <= 'Z') {
-    c += 'a' - 'A';
-  }
-  return c;
-}
-
-// toupper() changes based on locale.  We don't want this!
-char ToUpper(char c) {
-  if ('a' <= c && c <= 'z') {
-    c += 'A' - 'a';
-  }
-  return c;
-}
-
-string TrimString(const string& s) {
-  string::size_type start = s.find_first_not_of(" \n\r\t");
-  if (start == string::npos) {
-    return "";
-  }
-  string::size_type end = s.find_last_not_of(" \n\r\t") + 1;
-  return s.substr(start, end - start);
-}
 
 hash_set<string> MakeWordsMap(const char* const words[], size_t num_words) {
   hash_set<string> result;
@@ -126,7 +85,7 @@ string UnderscoresToCamelCase(const string& input, bool first_capitalized) {
   bool last_char_was_upper = false;
   for (int i = 0; i < input.size(); i++) {
     char c = input[i];
-    if (c >= '0' && c <= '9') {
+    if (ascii_isdigit(c)) {
       if (!last_char_was_number) {
         values.push_back(current);
         current = "";
@@ -134,7 +93,7 @@ string UnderscoresToCamelCase(const string& input, bool first_capitalized) {
       current += c;
       last_char_was_number = last_char_was_lower = last_char_was_upper = false;
       last_char_was_number = true;
-    } else if (IsLower(c)) {
+    } else if (ascii_islower(c)) {
       // lowercase letter can follow a lowercase or uppercase letter
       if (!last_char_was_lower && !last_char_was_upper) {
         values.push_back(current);
@@ -143,12 +102,12 @@ string UnderscoresToCamelCase(const string& input, bool first_capitalized) {
       current += c;  // already lower
       last_char_was_number = last_char_was_lower = last_char_was_upper = false;
       last_char_was_lower = true;
-    } else if (IsUpper(c)) {
+    } else if (ascii_isupper(c)) {
       if (!last_char_was_upper) {
         values.push_back(current);
         current = "";
       }
-      current += ToLower(c);
+      current += ascii_tolower(c);
       last_char_was_number = last_char_was_lower = last_char_was_upper = false;
       last_char_was_upper = true;
     } else {
@@ -162,7 +121,7 @@ string UnderscoresToCamelCase(const string& input, bool first_capitalized) {
     bool all_upper = (kUpperSegments.count(value) > 0);
     for (int j = 0; j < value.length(); j++) {
       if (j == 0 || all_upper) {
-        value[j] = ToUpper(value[j]);
+        value[j] = ascii_toupper(value[j]);
       } else {
         // Nothing, already in lower.
       }
@@ -174,7 +133,7 @@ string UnderscoresToCamelCase(const string& input, bool first_capitalized) {
     result += *i;
   }
   if ((result.length() != 0) && !first_capitalized) {
-    result[0] = ToLower(result[0]);
+    result[0] = ascii_tolower(result[0]);
   }
   return result;
 }
@@ -220,10 +179,9 @@ const char* const kReservedWordList[] = {
     // Only need to add instance methods that may conflict with
     // method declared in protos. The main cases are methods
     // that take no arguments, or setFoo:/hasFoo: type methods.
-    // These are currently in the same order as in GPBMessage.h.
-    "unknownFields", "extensionRegistry", "isInitialized",
-    "data", "delimitedData", "serializedSize",
-    "descriptor", "extensionsCurrentlySet", "clear", "sortedExtensionsInUse",
+    "clear", "data", "delimitedData", "descriptor", "extensionRegistry",
+    "extensionsCurrentlySet", "isInitialized", "serializedSize",
+    "sortedExtensionsInUse", "unknownFields",
 
     // MacTypes.h names
     "Fixed", "Fract", "Size", "LogicalAddress", "PhysicalAddress", "ByteCount",
@@ -284,7 +242,7 @@ bool IsSpecialName(const string& name, const string* special_names,
         // If name is longer than the retained_name[i] that it matches
         // the next character must be not lower case (newton vs newTon vs
         // new_ton).
-        return !IsLower(name[length]);
+        return !ascii_islower(name[length]);
       } else {
         return true;
       }
@@ -350,7 +308,8 @@ string FilePath(const FileDescriptor* file) {
 
 string FileClassPrefix(const FileDescriptor* file) {
   // Default is empty string, no need to check has_objc_class_prefix.
-  return file->options().objc_class_prefix();
+  string result = file->options().objc_class_prefix();
+  return result;
 }
 
 string FileClassName(const FileDescriptor* file) {
@@ -440,10 +399,10 @@ string UnCamelCaseEnumShortName(const string& name) {
   string result;
   for (int i = 0; i < name.size(); i++) {
     char c = name[i];
-    if (i > 0 && c >= 'A' && c <= 'Z') {
+    if (i > 0 && ascii_isupper(c)) {
       result += '_';
     }
-    result += ToUpper(c);
+    result += ascii_toupper(c);
   }
   return result;
 }
@@ -474,7 +433,7 @@ string FieldNameCapitalized(const FieldDescriptor* field) {
   // name.
   string result = FieldName(field);
   if (result.length() > 0) {
-    result[0] = ToUpper(result[0]);
+    result[0] = ascii_toupper(result[0]);
   }
   return result;
 }
@@ -483,7 +442,7 @@ string OneofEnumName(const OneofDescriptor* descriptor) {
   const Descriptor* fieldDescriptor = descriptor->containing_type();
   string name = ClassName(fieldDescriptor);
   name += "_" + UnderscoresToCamelCase(descriptor->name(), true) + "_OneOfCase";
-  // No sanitize needed because it the OS never has names that end in OneOfCase.
+  // No sanitize needed because the OS never has names that end in _OneOfCase.
   return name;
 }
 
@@ -498,7 +457,7 @@ string OneofNameCapitalized(const OneofDescriptor* descriptor) {
   // Use the common handling and then up-case the first letter.
   string result = OneofName(descriptor);
   if (result.length() > 0) {
-    result[0] = ToUpper(result[0]);
+    result[0] = ascii_toupper(result[0]);
   }
   return result;
 }
@@ -513,8 +472,8 @@ string UnCamelCaseFieldName(const string& name, const FieldDescriptor* field) {
   }
   if (field->type() == FieldDescriptor::TYPE_GROUP) {
     if (worker.length() > 0) {
-      if (worker[0] >= 'a' && worker[0] <= 'z') {
-        worker[0] = ToUpper(worker[0]);
+      if (ascii_islower(worker[0])) {
+        worker[0] = ascii_toupper(worker[0]);
       }
     }
     return worker;
@@ -522,11 +481,11 @@ string UnCamelCaseFieldName(const string& name, const FieldDescriptor* field) {
     string result;
     for (int i = 0; i < worker.size(); i++) {
       char c = worker[i];
-      if (c >= 'A' && c <= 'Z') {
+      if (ascii_isupper(c)) {
         if (i > 0) {
           result += '_';
         }
-        result += ToLower(c);
+        result += ascii_tolower(c);
       } else {
         result += c;
       }
@@ -566,7 +525,7 @@ string GetCapitalizedType(const FieldDescriptor* field) {
     case FieldDescriptor::TYPE_STRING:
       return "String";
     case FieldDescriptor::TYPE_BYTES:
-      return "Data";
+      return "Bytes";
     case FieldDescriptor::TYPE_ENUM:
       return "Enum";
     case FieldDescriptor::TYPE_GROUP:
@@ -575,6 +534,8 @@ string GetCapitalizedType(const FieldDescriptor* field) {
       return "Message";
   }
 
+  // Some compilers report reaching end of function even though all cases of
+  // the enum are handed in the switch.
   GOOGLE_LOG(FATAL) << "Can't get here.";
   return NULL;
 }
@@ -622,6 +583,8 @@ ObjectiveCType GetObjectiveCType(FieldDescriptor::Type field_type) {
       return OBJECTIVECTYPE_MESSAGE;
   }
 
+  // Some compilers report reaching end of function even though all cases of
+  // the enum are handed in the switch.
   GOOGLE_LOG(FATAL) << "Can't get here.";
   return OBJECTIVECTYPE_INT32;
 }
@@ -666,8 +629,9 @@ static string HandleExtremeFloatingPoint(string val, bool add_float_suffix) {
   }
 }
 
-string GPBValueFieldName(const FieldDescriptor* field) {
-  // Returns the field within the GPBValue union to use for the given field.
+string GPBGenericValueFieldName(const FieldDescriptor* field) {
+  // Returns the field within the GPBGenericValue union to use for the given
+  // field.
   if (field->is_repeated()) {
       return "valueMessage";
   }
@@ -698,6 +662,8 @@ string GPBValueFieldName(const FieldDescriptor* field) {
       return "valueMessage";
   }
 
+  // Some compilers report reaching end of function even though all cases of
+  // the enum are handed in the switch.
   GOOGLE_LOG(FATAL) << "Can't get here.";
   return NULL;
 }
@@ -754,7 +720,7 @@ string DefaultValue(const FieldDescriptor* field) {
 
         // Must convert to a standard byte order for packing length into
         // a cstring.
-        uint32_t length = htonl(default_string.length());
+        uint32 length = ghtonl(default_string.length());
         string bytes((const char*)&length, sizeof(length));
         bytes.append(default_string);
         return "(NSData*)\"" + CEscape(bytes) + "\"";
@@ -768,6 +734,8 @@ string DefaultValue(const FieldDescriptor* field) {
       return "nil";
   }
 
+  // Some compilers report reaching end of function even though all cases of
+  // the enum are handed in the switch.
   GOOGLE_LOG(FATAL) << "Can't get here.";
   return NULL;
 }
@@ -809,115 +777,253 @@ string BuildCommentsString(const SourceLocation& location) {
   return final_comments;
 }
 
-bool WriteClassList(string* error) {
-  const char* file_name = getenv("GPB_CLASSLIST_PATH");
-  if (file_name != NULL) {
-#ifndef O_EXLOCK
-    int fd = open(file_name, O_WRONLY | O_APPEND | O_CREAT,
-                  (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH));
-#else
-    int fd = open(file_name, O_WRONLY | O_APPEND | O_EXLOCK | O_CREAT,
-                  (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH));
-#endif
-    if (fd == -1) {
-      if (error != NULL) {
-        stringstream err_stream;
-        err_stream << endl << file_name << ":0:0: error:"
-                   << "Unable to open (" << errno << ")";
-        *error = err_stream.str();
-      }
+namespace {
+
+// Internal helper class that parses the expected package to prefix mappings
+// file.
+class Parser {
+ public:
+  Parser(map<string, string>* inout_package_to_prefix_map)
+      : prefix_map_(inout_package_to_prefix_map), line_(0) {}
+
+  // Parses a check of input, returning success/failure.
+  bool ParseChunk(StringPiece chunk);
+
+  // Should be called to finish parsing (after all input has been provided via
+  // ParseChunk()).  Returns success/failure.
+  bool Finish();
+
+  int last_line() const { return line_; }
+  string error_str() const { return error_str_; }
+
+ private:
+  bool ParseLoop();
+
+  map<string, string>* prefix_map_;
+  int line_;
+  string error_str_;
+  StringPiece p_;
+  string leftover_;
+};
+
+bool Parser::ParseChunk(StringPiece chunk) {
+  if (!leftover_.empty()) {
+    chunk.AppendToString(&leftover_);
+    p_ = StringPiece(leftover_);
+  } else {
+    p_ = chunk;
+  }
+  bool result = ParseLoop();
+  if (p_.empty()) {
+    leftover_.clear();
+  } else {
+    leftover_ = p_.ToString();
+  }
+  return result;
+}
+
+bool Parser::Finish() {
+  if (leftover_.empty()) {
+    return true;
+  }
+  // Force a newline onto the end to finish parsing.
+  p_ = StringPiece(leftover_ + "\n");
+  if (!ParseLoop()) {
+    return false;
+  }
+  return p_.empty();  // Everything used?
+}
+
+static bool ascii_isnewline(char c) { return c == '\n' || c == '\r'; }
+
+bool ReadLine(StringPiece* input, StringPiece* line) {
+  for (int len = 0; len < input->size(); ++len) {
+    if (ascii_isnewline((*input)[len])) {
+      *line = StringPiece(input->data(), len);
+      ++len;  // advance over the newline
+      *input = StringPiece(input->data() + len, input->size() - len);
+      return true;
+    }
+  }
+  return false;  // Ran out of input with no newline.
+}
+
+void TrimWhitespace(StringPiece* input) {
+  while (!input->empty() && ascii_isspace(*input->data())) {
+    input->remove_prefix(1);
+  }
+  while (!input->empty() && ascii_isspace((*input)[input->length() - 1])) {
+    input->remove_suffix(1);
+  }
+}
+
+void RemoveComment(StringPiece* input) {
+  int offset = input->find('#');
+  if (offset != StringPiece::npos) {
+    input->remove_suffix(input->length() - offset);
+  }
+}
+
+bool Parser::ParseLoop() {
+  StringPiece line;
+  while (ReadLine(&p_, &line)) {
+    ++line_;
+    RemoveComment(&line);
+    TrimWhitespace(&line);
+    if (line.size() == 0) {
+      continue;  // Blank line.
+    }
+    int offset = line.find('=');
+    if (offset == StringPiece::npos) {
+      error_str_ =
+          string("Line without equal sign: '") + line.ToString() + "'.";
       return false;
     }
-#ifndef O_EXLOCK
-    if (flock(fd, LOCK_EX) < 0) {
-      if (error != NULL) {
-        stringstream err_stream;
-        err_stream << endl << file_name << ":0:0: error:"
-                   << "Unable to lock (" << errno << ")";
-        *error = err_stream.str();
-      }
-      return false;
-    }
-#endif
-    // Need a local to hold the list so the cstring stays valid for the
-    // write call.
-    const string& class_list_str = gClassListStream.str();
-    int write_out = write(fd, class_list_str.c_str(), class_list_str.length());
-    int close_out = close(fd);
-    if (write_out == -1 || close_out == -1) {
-      if (error != NULL) {
-        stringstream err_stream;
-        err_stream << endl << file_name << ":0:0: error:"
-                   << "Unable to write (" << errno << ")";
-        *error = err_stream.str();
-      }
-      return false;
-    }
+    StringPiece package(line, 0, offset);
+    StringPiece prefix(line, offset + 1, line.length() - offset - 1);
+    TrimWhitespace(&package);
+    TrimWhitespace(&prefix);
+    // Don't really worry about error checking the the package/prefix for
+    // being valid.  Assume the file is validated when it is created/edited.
+    (*prefix_map_)[package.ToString()] = prefix.ToString();
   }
   return true;
 }
 
-void WriteClassNameToClassList(const string& name) {
-  if (gClassListStream.good()) {
-    gClassListStream << name << '\n';
-  }
-}
-
-bool InitializeClassWhitelist(string* error) {
-  const char* env_var_value = getenv("GPB_OBJC_CLASS_WHITELIST_PATHS");
-  if (env_var_value == NULL) {
+bool LoadExpectedPackagePrefixes(map<string, string>* prefix_map,
+                                 string* out_expect_file_path,
+                                 string* out_error) {
+  const char* file_path = getenv("GPB_OBJC_EXPECTED_PACKAGE_PREFIXES");
+  if (file_path == NULL) {
     return true;
   }
 
-  // The values are joined with ';' in case we ever want to make this a
-  // generator parameter also (instead of env var), and generator parameter
-  // parsing already has meaning for ',' and ':'.
-  vector<string> file_paths = Split(env_var_value, ";", true);
+  int fd;
+  do {
+    fd = open(file_path, O_RDONLY);
+  } while (fd < 0 && errno == EINTR);
+  if (fd < 0) {
+    *out_error =
+        string(file_path) + ":0:0: error: Unable to open." + strerror(errno);
+    return false;
+  }
+  io::FileInputStream file_stream(fd);
+  file_stream.SetCloseOnDelete(true);
+  *out_expect_file_path = file_path;
 
-  for (vector<string>::const_iterator i = file_paths.begin();
-       i != file_paths.end(); ++i) {
-    const string& file_path = *i;
-
-    ifstream stream(file_path.c_str(), ifstream::in);
-    if (!stream.good()) {
-      if (error != NULL) {
-        stringstream err_stream;
-        err_stream << endl << file_path << ":0:0: error: Unable to open";
-        *error = err_stream.str();
-        return false;
-      }
+  Parser parser(prefix_map);
+  const void* buf;
+  int buf_len;
+  while (file_stream.Next(&buf, &buf_len)) {
+    if (buf_len == 0) {
+      continue;
     }
 
-    string input_line;
-    while (stream.good()) {
-      getline(stream, input_line);
-      string trimmed_line(TrimString(input_line));
-      if (trimmed_line.length() == 0) {
-        // Skip empty lines
-        continue;
-      }
-      if (trimmed_line[0] == '/' || trimmed_line[0] == '#') {
-        // Skip comments and potential preprocessor symbols
-        continue;
-      }
-      gClassWhitelist.insert(trimmed_line);
+    if (!parser.ParseChunk(StringPiece(static_cast<const char*>(buf), buf_len))) {
+      *out_error = string(file_path) + ":" + SimpleItoa(parser.last_line()) +
+                   ":0: error: " + parser.error_str();
+      return false;
     }
   }
-  return true;
+  return parser.Finish();
 }
 
-bool FilterClass(const string& name) {
-  if (gClassWhitelist.count(name) > 0) {
-    // Whitelisted, don't filter.
+}  // namespace
+
+bool ValidateObjCClassPrefix(const FileDescriptor* file, string* out_error) {
+  const string prefix = file->options().objc_class_prefix();
+  const string package = file->package();
+
+  // NOTE: src/google/protobuf/compiler/plugin.cc makes use of cerr for some
+  // error cases, so it seems to be ok to use as a back door for warnings.
+
+  // First Check: Warning - if there is a prefix, ensure it is is a reasonable
+  // value according to Apple's rules.
+  if (prefix.length()) {
+    if (!ascii_isupper(prefix[0])) {
+      cerr << endl
+           << "protoc:0: warning: Invalid 'option objc_class_prefix = \""
+           << prefix << "\";' in '" << file->name() << "';"
+           << " it should start with a capital letter." << endl;
+      cerr.flush();
+    }
+    if (prefix.length() < 3) {
+      cerr << endl
+           << "protoc:0: warning: Invalid 'option objc_class_prefix = \""
+           << prefix << "\";' in '" << file->name() << "';"
+           << " Apple recommends they should be at least 3 characters long."
+           << endl;
+      cerr.flush();
+    }
+  }
+
+  // Load any expected package prefixes to validate against those.
+  map<string, string> expected_package_prefixes;
+  string expect_file_path;
+  if (!LoadExpectedPackagePrefixes(&expected_package_prefixes,
+                                   &expect_file_path, out_error)) {
     return false;
   }
 
-  // If there was no list, default to everything in.
-  // If there was a list, default to everything out.
-  return gClassWhitelist.size() > 0;
+  // If there are no expected prefixes, out of here.
+  if (expected_package_prefixes.size() == 0) {
+    return true;
+  }
+
+  // Second Check: Error - See if there was an expected prefix for the package
+  // and report if it doesn't match.
+  map<string, string>::iterator package_match =
+      expected_package_prefixes.find(package);
+  if (package_match != expected_package_prefixes.end()) {
+    // There was an entry, and...
+    if (package_match->second == prefix) {
+      // ...it matches.  All good, out of here!
+      return true;
+    } else {
+      // ...it didn't match!
+      *out_error = "protoc:0: error: Expected 'option objc_class_prefix = \"" +
+                   package_match->second + "\";' in '" + file->name() + "'";
+      if (prefix.length()) {
+        *out_error += "; but found '" + prefix + "' instead";
+      }
+      *out_error += ".";
+      return false;
+    }
+  }
+
+  // Third Check: Error - If there was a prefix make sure it wasn't expected
+  // for a different package instead (overlap is allowed, but it has to be
+  // listed as an expected overlap).
+  if (prefix.length()) {
+    for (map<string, string>::iterator i = expected_package_prefixes.begin();
+         i != expected_package_prefixes.end(); ++i) {
+      if (i->second == prefix) {
+        *out_error =
+            "protoc:0: error: Found 'option objc_class_prefix = \"" + prefix +
+            "\";' in '" + file->name() +
+            "'; that prefix is already used for 'package " + i->first +
+            ";'. It can only be reused by listing it in the expected file (" +
+            expect_file_path + ").";
+        return false;  // Only report first usage of the prefix.
+      }
+    }
+  }
+
+  // Fourth Check: Warning - If there was a prefix, and it wasn't expected,
+  // issue a warning suggesting it gets added to the file.
+  if (prefix.length()) {
+    cerr << endl
+         << "protoc:0: warning: Found 'option objc_class_prefix = \"" << prefix
+         << "\";' in '" << file->name() << "';"
+         << " should you add it to the expected prefixes file ("
+         << expect_file_path << ")?" << endl;
+    cerr.flush();
+  }
+
+  return true;
 }
 
-void TextFormatDecodeData::AddString(int32_t key,
+void TextFormatDecodeData::AddString(int32 key,
                                      const string& input_for_decode,
                                      const string& desired_output) {
   for (vector<DataEntry>::const_iterator i = entries_.begin();
@@ -973,22 +1079,22 @@ class DecodeDataBuilder {
   }
 
  private:
-  static const uint8_t kAddUnderscore = 0b10000000;
+  static const uint8 kAddUnderscore = 0x80;
 
-  static const uint8_t kOpAsIs = 0b00000000;
-  static const uint8_t kOpFirstUpper = 0b01000000;
-  static const uint8_t kOpFirstLower = 0b00100000;
-  static const uint8_t kOpAllUpper = 0b01100000;
+  static const uint8 kOpAsIs        = 0x00;
+  static const uint8 kOpFirstUpper  = 0x40;
+  static const uint8 kOpFirstLower  = 0x20;
+  static const uint8 kOpAllUpper    = 0x60;
 
-  static const int kMaxSegmentLen = 0b00011111;
+  static const int kMaxSegmentLen     = 0x1f;
 
   void AddChar(const char desired) {
     ++segment_len_;
-    is_all_upper_ &= IsUpper(desired);
+    is_all_upper_ &= ascii_isupper(desired);
   }
 
   void Push() {
-    uint8_t op = (op_ | segment_len_);
+    uint8 op = (op_ | segment_len_);
     if (need_underscore_) op |= kAddUnderscore;
     if (op != 0) {
       decode_data_ += (char)op;
@@ -999,9 +1105,9 @@ class DecodeDataBuilder {
   bool AddFirst(const char desired, const char input) {
     if (desired == input) {
       op_ = kOpAsIs;
-    } else if (desired == ToUpper(input)) {
+    } else if (desired == ascii_toupper(input)) {
       op_ = kOpFirstUpper;
-    } else if (desired == ToLower(input)) {
+    } else if (desired == ascii_tolower(input)) {
       op_ = kOpFirstLower;
     } else {
       // Can't be transformed to match.
@@ -1020,7 +1126,7 @@ class DecodeDataBuilder {
 
   bool need_underscore_;
   bool is_all_upper_;
-  uint8_t op_;
+  uint8 op_;
   int segment_len_;
 
   string decode_data_;
@@ -1039,7 +1145,7 @@ bool DecodeDataBuilder::AddCharacter(const char desired, const char input) {
   if (desired == input) {
     // If we aren't transforming it, or we're upper casing it and it is
     // supposed to be uppercase; just add it to the segment.
-    if ((op_ != kOpAllUpper) || IsUpper(desired)) {
+    if ((op_ != kOpAllUpper) || ascii_isupper(desired)) {
       AddChar(desired);
       return true;
     }
@@ -1051,7 +1157,7 @@ bool DecodeDataBuilder::AddCharacter(const char desired, const char input) {
 
   // If we need to uppercase, and everything so far has been uppercase,
   // promote op to AllUpper.
-  if ((desired == ToUpper(input)) && is_all_upper_) {
+  if ((desired == ascii_toupper(input)) && is_all_upper_) {
     op_ = kOpAllUpper;
     AddChar(desired);
     return true;

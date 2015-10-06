@@ -39,10 +39,6 @@
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/strutil.h>
 
-#ifndef htonl
-#include <netinet/in.h>
-#endif
-
 namespace google {
 namespace protobuf {
 namespace compiler {
@@ -84,30 +80,28 @@ void SetCommonFieldVariables(const FieldDescriptor* descriptor,
   if (descriptor->is_repeated()) field_flags.push_back("GPBFieldRepeated");
   if (descriptor->is_required()) field_flags.push_back("GPBFieldRequired");
   if (descriptor->is_optional()) field_flags.push_back("GPBFieldOptional");
-  if (descriptor->options().packed()) field_flags.push_back("GPBFieldPacked");
+  if (descriptor->is_packed()) field_flags.push_back("GPBFieldPacked");
 
   // ObjC custom flags.
   if (descriptor->has_default_value())
     field_flags.push_back("GPBFieldHasDefaultValue");
   if (needs_custom_name) field_flags.push_back("GPBFieldTextFormatNameCustom");
   if (descriptor->type() == FieldDescriptor::TYPE_ENUM) {
-  // TODO(thomasvl): Output the CPP check to use descFunc or validator based
-  // on final compile.
     field_flags.push_back("GPBFieldHasEnumDescriptor");
   }
 
   (*variables)["fieldflags"] = BuildFlagsString(field_flags);
 
   (*variables)["default"] = DefaultValue(descriptor);
-  (*variables)["default_name"] = GPBValueFieldName(descriptor);
+  (*variables)["default_name"] = GPBGenericValueFieldName(descriptor);
 
-  (*variables)["typeSpecific_name"] = "className";
-  (*variables)["typeSpecific_value"] = "NULL";
+  (*variables)["dataTypeSpecific_name"] = "className";
+  (*variables)["dataTypeSpecific_value"] = "NULL";
 
   string field_options = descriptor->options().SerializeAsString();
   // Must convert to a standard byte order for packing length into
   // a cstring.
-  uint32_t length = htonl(field_options.length());
+  uint32 length = ghtonl(field_options.length());
   if (length > 0) {
     string bytes((const char*)&length, sizeof(length));
     bytes.append(field_options);
@@ -121,45 +115,6 @@ void SetCommonFieldVariables(const FieldDescriptor* descriptor,
   (*variables)["storage_attribute"] = "";
 }
 
-// A field generator that writes nothing.
-class EmptyFieldGenerator : public FieldGenerator {
- public:
-  EmptyFieldGenerator(const FieldDescriptor* descriptor, const string& reason)
-      : FieldGenerator(descriptor), reason_(reason) {}
-  virtual ~EmptyFieldGenerator() {}
-
-  virtual void GenerateFieldStorageDeclaration(io::Printer* printer) const {}
-  virtual void GeneratePropertyDeclaration(io::Printer* printer) const {
-    string name = FieldName(descriptor_);
-    string type;
-    switch (GetObjectiveCType(descriptor_)) {
-      case OBJECTIVECTYPE_MESSAGE:
-        type = ClassName(descriptor_->message_type()) + " *";
-        break;
-
-      case OBJECTIVECTYPE_ENUM:
-        type = EnumName(descriptor_->enum_type()) + " ";
-        break;
-
-      default:
-        type = string(descriptor_->type_name()) + " ";
-        break;
-    }
-    printer->Print("// Field |$type$$name$| $reason$\n\n", "type", type, "name",
-                   name, "reason", reason_);
-  }
-
-  virtual void GenerateFieldNumberConstant(io::Printer* printer) const {}
-  virtual void GeneratePropertyImplementation(io::Printer* printer) const {}
-  virtual void GenerateFieldDescription(io::Printer* printer) const {}
-
-  virtual bool WantsHasProperty(void) const { return false; }
-
- private:
-  string reason_;
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(EmptyFieldGenerator);
-};
-
 }  // namespace
 
 FieldGenerator* FieldGenerator::Make(const FieldDescriptor* field) {
@@ -167,12 +122,7 @@ FieldGenerator* FieldGenerator::Make(const FieldDescriptor* field) {
   if (field->is_repeated()) {
     switch (GetObjectiveCType(field)) {
       case OBJECTIVECTYPE_MESSAGE: {
-        string type = ClassName(field->message_type());
-        if (FilterClass(type)) {
-          string reason =
-              "Filtered by |" + type + "| not being whitelisted.";
-          result = new EmptyFieldGenerator(field, reason);
-        } else if (field->is_map()) {
+        if (field->is_map()) {
           result = new MapFieldGenerator(field);
         } else {
           result = new RepeatedMessageFieldGenerator(field);
@@ -189,14 +139,7 @@ FieldGenerator* FieldGenerator::Make(const FieldDescriptor* field) {
   } else {
     switch (GetObjectiveCType(field)) {
       case OBJECTIVECTYPE_MESSAGE: {
-        string type = ClassName(field->message_type());
-        if (FilterClass(type)) {
-          string reason =
-              "Filtered by |" + type + "| not being whitelisted.";
-          result = new EmptyFieldGenerator(field, reason);
-        } else {
-          result = new MessageFieldGenerator(field);
-        }
+        result = new MessageFieldGenerator(field);
         break;
       }
       case OBJECTIVECTYPE_ENUM:
@@ -239,6 +182,11 @@ void FieldGenerator::GenerateCFunctionImplementations(
   // Nothing
 }
 
+void FieldGenerator::DetermineForwardDeclarations(
+    set<string>* fwd_decls) const {
+  // Nothing
+}
+
 void FieldGenerator::GenerateFieldDescription(
     io::Printer* printer) const {
   printer->Print(
@@ -248,14 +196,20 @@ void FieldGenerator::GenerateFieldDescription(
       "  .number = $field_number_name$,\n"
       "  .hasIndex = $has_index$,\n"
       "  .flags = $fieldflags$,\n"
-      "  .type = GPBType$field_type$,\n"
-      "  .offset = offsetof($classname$_Storage, $name$),\n"
+      "  .dataType = GPBDataType$field_type$,\n"
+      "  .offset = offsetof($classname$__storage_, $name$),\n"
       "  .defaultValue.$default_name$ = $default$,\n");
 
-  // "  .typeSpecific.value* = [something],"
+  // TODO(thomasvl): It might be useful to add a CPP wrapper to support
+  // compiling away the EnumDescriptors.  To do that, we'd need a #if here
+  // to control setting the descriptor vs. the validator, and above in
+  // SetCommonFieldVariables() we'd want to wrap how we add
+  // GPBFieldHasDefaultValue to the flags.
+
+  // "  .dataTypeSpecific.value* = [something],"
   GenerateFieldDescriptionTypeSpecific(printer);
 
-  const string& field_options(variables_.at("fieldoptions"));
+  const string& field_options(variables_.find("fieldoptions")->second);
   if (field_options.empty()) {
     printer->Print("  .fieldOptions = NULL,\n");
   } else {
@@ -279,19 +233,23 @@ void FieldGenerator::GenerateFieldDescriptionTypeSpecific(
     io::Printer* printer) const {
   printer->Print(
       variables_,
-      "  .typeSpecific.$typeSpecific_name$ = $typeSpecific_value$,\n");
+      "  .dataTypeSpecific.$dataTypeSpecific_name$ = $dataTypeSpecific_value$,\n");
 }
 
 void FieldGenerator::SetOneofIndexBase(int index_base) {
   if (descriptor_->containing_oneof() != NULL) {
     int index = descriptor_->containing_oneof()->index() + index_base;
     // Flip the sign to mark it as a oneof.
-    variables_["has_index"] = SimpleItoa(-index);;
+    variables_["has_index"] = SimpleItoa(-index);
   }
 }
 
 void FieldGenerator::FinishInitialization(void) {
-  // Nothing
+  // If "property_type" wasn't set, make it "storage_type".
+  if ((variables_.find("property_type") == variables_.end()) &&
+      (variables_.find("storage_type") != variables_.end())) {
+    variables_["property_type"] = variable("storage_type");
+  }
 }
 
 SingleFieldGenerator::SingleFieldGenerator(
@@ -317,7 +275,7 @@ void SingleFieldGenerator::GeneratePropertyDeclaration(
   }
   printer->Print(
       variables_,
-      "@property(nonatomic, readwrite) $storage_type$ $name$;\n"
+      "@property(nonatomic, readwrite) $property_type$ $name$;\n"
       "\n");
 }
 
@@ -373,12 +331,12 @@ void ObjCObjFieldGenerator::GeneratePropertyDeclaration(
   }
   printer->Print(
       variables_,
-      "@property(nonatomic, readwrite, $property_storage_attribute$) $storage_type$ *$name$$storage_attribute$;\n");
-  if (IsInitName(variables_.at("name"))) {
+      "@property(nonatomic, readwrite, $property_storage_attribute$, null_resettable) $property_type$ *$name$$storage_attribute$;\n");
+  if (IsInitName(variables_.find("name")->second)) {
     // If property name starts with init we need to annotate it to get past ARC.
     // http://stackoverflow.com/questions/18723226/how-do-i-annotate-an-objective-c-property-with-an-objc-method-family/18723227#18723227
     printer->Print(variables_,
-                   "- ($storage_type$ *)$name$ GPB_METHOD_FAMILY_NONE;\n");
+                   "- ($property_type$ *)$name$ GPB_METHOD_FAMILY_NONE;\n");
   }
   printer->Print("\n");
 }
@@ -405,23 +363,25 @@ void RepeatedFieldGenerator::GenerateFieldStorageDeclaration(
 
 void RepeatedFieldGenerator::GeneratePropertyImplementation(
     io::Printer* printer) const {
-  printer->Print(variables_, "@dynamic $name$;\n");
+  printer->Print(variables_, "@dynamic $name$, $name$_Count;\n");
 }
 
 void RepeatedFieldGenerator::GeneratePropertyDeclaration(
     io::Printer* printer) const {
 
-  // Repeated fields don't need the has* properties, but this has the same
-  // logic as ObjCObjFieldGenerator::GeneratePropertyDeclaration() for dealing
-  // with needing Objective C's rules around storage name conventions (init*,
-  // new*, etc.)
+  // Repeated fields don't need the has* properties, but they do expose a
+  // *Count (to check without autocreation).  So for the field property we need
+  // the same logic as ObjCObjFieldGenerator::GeneratePropertyDeclaration() for
+  // dealing with needing Objective C's rules around storage name conventions
+  // (init*, new*, etc.)
 
   printer->Print(
       variables_,
       "$comments$"
       "$array_comment$"
-      "@property(nonatomic, readwrite, strong) $array_storage_type$ *$name$$storage_attribute$;\n");
-  if (IsInitName(variables_.at("name"))) {
+      "@property(nonatomic, readwrite, strong, null_resettable) $array_storage_type$ *$name$$storage_attribute$;\n"
+      "@property(nonatomic, readonly) NSUInteger $name$_Count;\n");
+  if (IsInitName(variables_.find("name")->second)) {
     // If property name starts with init we need to annotate it to get past ARC.
     // http://stackoverflow.com/questions/18723226/how-do-i-annotate-an-objective-c-property-with-an-objc-method-family/18723227#18723227
     printer->Print(variables_,

@@ -32,7 +32,6 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include <set>
 #include <map>
 
 #include <google/protobuf/compiler/cpp/cpp_enum.h>
@@ -70,12 +69,20 @@ EnumGenerator::EnumGenerator(const EnumDescriptor* descriptor,
 
 EnumGenerator::~EnumGenerator() {}
 
+void EnumGenerator::FillForwardDeclaration(set<string>* enum_names) {
+  if (!options_.proto_h) {
+    return;
+  }
+  enum_names->insert(classname_);
+}
+
 void EnumGenerator::GenerateDefinition(io::Printer* printer) {
   map<string, string> vars;
   vars["classname"] = classname_;
   vars["short_name"] = descriptor_->name();
+  vars["enumbase"] = classname_ + (options_.proto_h ? " : int" : "");
 
-  printer->Print(vars, "enum $classname$ {\n");
+  printer->Print(vars, "enum $enumbase$ {\n");
   printer->Indent();
 
   const EnumValueDescriptor* min_value = descriptor_->value(0);
@@ -89,7 +96,6 @@ void EnumGenerator::GenerateDefinition(io::Printer* printer) {
     vars["number"] = Int32ToString(descriptor_->value(i)->number());
     vars["prefix"] = (descriptor_->containing_type() == NULL) ?
       "" : classname_ + "_";
-
 
     if (i > 0) printer->Print(",\n");
     printer->Print(vars, "$prefix$$name$ = $number$");

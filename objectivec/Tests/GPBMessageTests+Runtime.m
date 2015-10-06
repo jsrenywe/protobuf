@@ -35,6 +35,8 @@
 #import "GPBMessage.h"
 
 #import "google/protobuf/MapUnittest.pbobjc.h"
+#import "google/protobuf/Unittest.pbobjc.h"
+#import "google/protobuf/UnittestObjcStartup.pbobjc.h"
 #import "google/protobuf/UnittestRuntimeProto2.pbobjc.h"
 #import "google/protobuf/UnittestRuntimeProto3.pbobjc.h"
 
@@ -45,6 +47,14 @@
 
 // TODO(thomasvl): Pull tests over from GPBMessageTests that are runtime
 // specific.
+
+- (void)testStartupOrdering {
+  // Just have to create a message.  Nothing else uses the classes from
+  // this file, so the first selector invoked on the class will initialize
+  // it, which also initializes the root.
+  TestObjCStartupMessage *message = [TestObjCStartupMessage message];
+  XCTAssertNotNil(message);
+}
 
 - (void)testProto2HasMethodSupport {
   NSArray *names = @[
@@ -69,8 +79,8 @@
   ];
 
   // Proto2 gets:
-  //  - has* on all non repeated fields.
-  //  - setHas* on all non repeated fields.
+
+  // Single fields - has*/setHas* is valid.
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasOptionalInt32/setHasOptionalInt32:
@@ -84,21 +94,28 @@
                   name);
   }
 
-  // Repeated - no has/setHas
+  // Repeated fields
+  //  - no has*/setHas*
+  //  - *Count
 
   for (NSString *name in names) {
-    // build the selector, i.e. - hasRepeatedInt32/setHasRepeatedInt32:
+    // build the selector, i.e. - hasRepeatedInt32Array/setHasRepeatedInt32Array:
     SEL hasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"hasRepeated%@", name]);
+        [NSString stringWithFormat:@"hasRepeated%@Array", name]);
     SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasRepeated%@:", name]);
+        [NSString stringWithFormat:@"setHasRepeated%@Array:", name]);
     XCTAssertFalse([Message2 instancesRespondToSelector:hasSel], @"field: %@",
                    name);
     XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel],
                    @"field: %@", name);
+    // build the selector, i.e. - repeatedInt32Array_Count
+    SEL countSel = NSSelectorFromString(
+        [NSString stringWithFormat:@"repeated%@Array_Count", name]);
+    XCTAssertTrue([Message2 instancesRespondToSelector:countSel], @"field: %@",
+                   name);
   }
 
-  // Oneofs - no has/setHas
+  // OneOf fields - no has*/setHas*
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasOneofInt32/setHasOneofInt32:
@@ -111,6 +128,50 @@
     XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel],
                    @"field: %@", name);
   }
+
+  // map<> fields
+  //  - no has*/setHas*
+  //  - *Count
+
+  NSArray *mapNames = @[
+    @"Int32Int32",
+    @"Int64Int64",
+    @"Uint32Uint32",
+    @"Uint64Uint64",
+    @"Sint32Sint32",
+    @"Sint64Sint64",
+    @"Fixed32Fixed32",
+    @"Fixed64Fixed64",
+    @"Sfixed32Sfixed32",
+    @"Sfixed64Sfixed64",
+    @"Int32Float",
+    @"Int32Double",
+    @"BoolBool",
+    @"StringString",
+    @"StringBytes",
+    @"StringMessage",
+    @"Int32Bytes",
+    @"Int32Enum",
+    @"Int32Message",
+  ];
+
+  for (NSString *name in mapNames) {
+    // build the selector, i.e. - hasMapInt32Int32/setHasMapInt32Int32:
+    SEL hasSel = NSSelectorFromString(
+        [NSString stringWithFormat:@"hasMap%@", name]);
+    SEL setHasSel = NSSelectorFromString(
+        [NSString stringWithFormat:@"setHasMap%@:", name]);
+    XCTAssertFalse([Message2 instancesRespondToSelector:hasSel], @"field: %@",
+                   name);
+    XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel],
+                   @"field: %@", name);
+    // build the selector, i.e. - mapInt32Int32Count
+    SEL countSel = NSSelectorFromString(
+        [NSString stringWithFormat:@"map%@_Count", name]);
+    XCTAssertTrue([Message2 instancesRespondToSelector:countSel], @"field: %@",
+                   name);
+  }
+
 }
 
 - (void)testProto3HasMethodSupport {
@@ -135,10 +196,10 @@
   ];
 
   // Proto3 gets:
-  //  - has* on non repeated message fields.
-  //  - setHas* on all non repeated message fields.
 
-  // Singlular
+  // Single fields
+  //  - has*/setHas* invalid for primative types.
+  //  - has*/setHas* valid for Message.
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasOptionalInt32/setHasOptionalInt32:
@@ -146,7 +207,7 @@
         [NSString stringWithFormat:@"hasOptional%@", name]);
     SEL setHasSel = NSSelectorFromString(
         [NSString stringWithFormat:@"setHasOptional%@:", name]);
-    if ([name isEqual:@"Group"] || [name isEqual:@"Message"]) {
+    if ([name isEqual:@"Message"]) {
       // Sub messages/groups are the exception.
       XCTAssertTrue([Message3 instancesRespondToSelector:hasSel], @"field: %@",
                     name);
@@ -160,21 +221,28 @@
     }
   }
 
-  // Repeated - no has/setHas
+  // Repeated fields
+  //  - no has*/setHas*
+  //  - *Count
 
   for (NSString *name in names) {
-    // build the selector, i.e. - hasRepeatedInt32/setHasRepeatedInt32:
+    // build the selector, i.e. - hasRepeatedInt32Array/setHasRepeatedInt32Array:
     SEL hasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"hasRepeated%@", name]);
+        [NSString stringWithFormat:@"hasRepeated%@Array", name]);
     SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasRepeated%@:", name]);
+        [NSString stringWithFormat:@"setHasRepeated%@Array:", name]);
     XCTAssertFalse([Message3 instancesRespondToSelector:hasSel], @"field: %@",
                    name);
     XCTAssertFalse([Message3 instancesRespondToSelector:setHasSel],
                    @"field: %@", name);
+    // build the selector, i.e. - repeatedInt32Array_Count
+    SEL countSel = NSSelectorFromString(
+        [NSString stringWithFormat:@"repeated%@Array_Count", name]);
+    XCTAssertTrue([Message2 instancesRespondToSelector:countSel], @"field: %@",
+                  name);
   }
 
-  // Oneofs - no has/setHas
+  // OneOf fields - no has*/setHas*
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasOneofInt32/setHasOneofInt32:
@@ -186,6 +254,49 @@
                    name);
     XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel],
                    @"field: %@", name);
+  }
+
+  // map<> fields
+  //  - no has*/setHas*
+  //  - *Count
+
+  NSArray *mapNames = @[
+    @"Int32Int32",
+    @"Int64Int64",
+    @"Uint32Uint32",
+    @"Uint64Uint64",
+    @"Sint32Sint32",
+    @"Sint64Sint64",
+    @"Fixed32Fixed32",
+    @"Fixed64Fixed64",
+    @"Sfixed32Sfixed32",
+    @"Sfixed64Sfixed64",
+    @"Int32Float",
+    @"Int32Double",
+    @"BoolBool",
+    @"StringString",
+    @"StringBytes",
+    @"StringMessage",
+    @"Int32Bytes",
+    @"Int32Enum",
+    @"Int32Message",
+  ];
+
+  for (NSString *name in mapNames) {
+    // build the selector, i.e. - hasMapInt32Int32/setHasMapInt32Int32:
+    SEL hasSel = NSSelectorFromString(
+        [NSString stringWithFormat:@"hasMap%@", name]);
+    SEL setHasSel = NSSelectorFromString(
+        [NSString stringWithFormat:@"setHasMap%@:", name]);
+    XCTAssertFalse([Message2 instancesRespondToSelector:hasSel], @"field: %@",
+                   name);
+    XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel],
+                   @"field: %@", name);
+    // build the selector, i.e. - mapInt32Int32Count
+    SEL countSel = NSSelectorFromString(
+        [NSString stringWithFormat:@"map%@_Count", name]);
+    XCTAssertTrue([Message2 instancesRespondToSelector:countSel], @"field: %@",
+                   name);
   }
 }
 
@@ -772,6 +883,8 @@
   XCTAssertThrowsSpecificNamed(msg.oneofEnum = 666, NSException,
                                NSInvalidArgumentException);
   XCTAssertEqual(msg.oneofEnum, Message2_Enum_Bar);
+
+  [msg release];
 }
 
 - (void)testAccessingProto3UnknownEnumValues {
@@ -1261,7 +1374,7 @@
     Message2_O_OneOfCase_OneofEnum,
   };
 
-  for (size_t i = 0; i < (sizeof(values) / sizeof((values[0]))); ++i) {
+  for (size_t i = 0; i < GPBARRAYSIZE(values); ++i) {
     switch (values[i]) {
       case Message2_O_OneOfCase_OneofInt32:
         msg.oneofInt32 = 1;
@@ -1318,7 +1431,7 @@
         msg.oneofEnum = Message2_Enum_Bar;
         break;
       default:
-        XCTFail(@"shouldn't happen, loop: %zd", i);
+        XCTFail(@"shouldn't happen, loop: %zd, value: %d", i, values[i]);
         break;
     }
 
@@ -1770,7 +1883,7 @@
     Message3_O_OneOfCase_OneofEnum,
   };
 
-  for (size_t i = 0; i < (sizeof(values) / sizeof((values[0]))); ++i) {
+  for (size_t i = 0; i < GPBARRAYSIZE(values); ++i) {
     switch (values[i]) {
       case Message3_O_OneOfCase_OneofInt32:
         msg.oneofInt32 = 1;
@@ -1824,7 +1937,7 @@
         msg.oneofEnum = Message3_Enum_Baz;
         break;
       default:
-        XCTFail(@"shouldn't happen, loop: %zd", i);
+        XCTFail(@"shouldn't happen, loop: %zd, value: %d", i, values[i]);
         break;
     }
 
@@ -1946,9 +2059,9 @@
 
   // Ensure the messages are unique per map.
   [msg1.mapInt32ForeignMessage
-      enumerateKeysAndValuesUsingBlock:^(int32_t key, id value, BOOL *stop) {
+      enumerateKeysAndObjectsUsingBlock:^(int32_t key, id value, BOOL *stop) {
 #pragma unused(stop)
-        ForeignMessage *subMsg2 = [msg2.mapInt32ForeignMessage valueForKey:key];
+        ForeignMessage *subMsg2 = [msg2.mapInt32ForeignMessage objectForKey:key];
         XCTAssertNotEqual(value, subMsg2);  // Ptr compare, new object.
       }];
 }
@@ -1962,7 +2075,7 @@
   // Add an uninitialized message.
   TestRequired *subMsg = [[TestRequired alloc] init];
   msg.mapField = [GPBInt32ObjectDictionary dictionary];
-  [msg.mapField setValue:subMsg forKey:0];
+  [msg.mapField setObject:subMsg forKey:0];
   XCTAssertFalse(msg.initialized);
 
   // Initialize uninitialized message

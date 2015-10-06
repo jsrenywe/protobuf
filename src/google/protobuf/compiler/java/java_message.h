@@ -102,10 +102,6 @@ class ImmutableMessageGenerator : public MessageGenerator {
   virtual int GenerateStaticVariableInitializers(io::Printer* printer);
 
  private:
-  enum UseMemoization {
-    MEMOIZE,
-    DONT_MEMOIZE
-  };
 
   void GenerateFieldAccessorTable(io::Printer* printer);
 
@@ -120,15 +116,13 @@ class ImmutableMessageGenerator : public MessageGenerator {
       io::Printer* printer, const Descriptor::ExtensionRange* range);
 
   void GenerateBuilder(io::Printer* printer);
-  void GenerateCommonBuilderMethods(io::Printer* printer);
-  void GenerateDescriptorMethods(io::Printer* printer, bool is_builder);
-  void GenerateBuilderParsingMethods(io::Printer* printer);
-  void GenerateIsInitialized(io::Printer* printer,
-      UseMemoization useMemoization);
+  void GenerateIsInitialized(io::Printer* printer);
+  void GenerateDescriptorMethods(io::Printer* printer);
   void GenerateInitializers(io::Printer* printer);
   void GenerateEqualsAndHashCode(io::Printer* printer);
   void GenerateParser(io::Printer* printer);
   void GenerateParsingConstructor(io::Printer* printer);
+  void GenerateAnyMethods(io::Printer* printer);
 
   Context* context_;
   ClassNameResolver* name_resolver_;

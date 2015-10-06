@@ -32,6 +32,7 @@
 
 #import "google/protobuf/MapUnittest.pbobjc.h"
 #import "google/protobuf/Unittest.pbobjc.h"
+#import "google/protobuf/UnittestImport.pbobjc.h"
 
 const uint32_t kGPBDefaultRepeatCount = 2;
 
@@ -598,6 +599,33 @@ const uint32_t kGPBDefaultRepeatCount = 2;
   XCTAssertEqual(count, message.repeatedStringPieceArray.count);
   XCTAssertEqual(count, message.repeatedCordArray.count);
 
+  XCTAssertEqual(count, message.repeatedInt32Array_Count);
+  XCTAssertEqual(count, message.repeatedInt64Array_Count);
+  XCTAssertEqual(count, message.repeatedUint32Array_Count);
+  XCTAssertEqual(count, message.repeatedUint64Array_Count);
+  XCTAssertEqual(count, message.repeatedSint32Array_Count);
+  XCTAssertEqual(count, message.repeatedSint64Array_Count);
+  XCTAssertEqual(count, message.repeatedFixed32Array_Count);
+  XCTAssertEqual(count, message.repeatedFixed64Array_Count);
+  XCTAssertEqual(count, message.repeatedSfixed32Array_Count);
+  XCTAssertEqual(count, message.repeatedSfixed64Array_Count);
+  XCTAssertEqual(count, message.repeatedFloatArray_Count);
+  XCTAssertEqual(count, message.repeatedDoubleArray_Count);
+  XCTAssertEqual(count, message.repeatedBoolArray_Count);
+  XCTAssertEqual(count, message.repeatedStringArray_Count);
+  XCTAssertEqual(count, message.repeatedBytesArray_Count);
+
+  XCTAssertEqual(count, message.repeatedGroupArray_Count);
+  XCTAssertEqual(count, message.repeatedNestedMessageArray_Count);
+  XCTAssertEqual(count, message.repeatedForeignMessageArray_Count);
+  XCTAssertEqual(count, message.repeatedImportMessageArray_Count);
+  XCTAssertEqual(count, message.repeatedNestedEnumArray_Count);
+  XCTAssertEqual(count, message.repeatedForeignEnumArray_Count);
+  XCTAssertEqual(count, message.repeatedImportEnumArray_Count);
+
+  XCTAssertEqual(count, message.repeatedStringPieceArray_Count);
+  XCTAssertEqual(count, message.repeatedCordArray_Count);
+
   for (uint32_t i = 0; i < count; ++i) {
     XCTAssertEqual((int)(201 + i * 100),
                    [message.repeatedInt32Array valueAtIndex:i]);
@@ -1060,25 +1088,6 @@ const uint32_t kGPBDefaultRepeatCount = 2;
 }
 
 - (void)setAllMapFields:(TestMap *)message numEntries:(uint32_t)count {
-  message.mapInt32Int32 = [GPBInt32Int32Dictionary dictionary];
-  message.mapInt64Int64 = [GPBInt64Int64Dictionary dictionary];
-  message.mapUint32Uint32 = [GPBUInt32UInt32Dictionary dictionary];
-  message.mapUint64Uint64 = [GPBUInt64UInt64Dictionary dictionary];
-  message.mapSint32Sint32 = [GPBInt32Int32Dictionary dictionary];
-  message.mapSint64Sint64 = [GPBInt64Int64Dictionary dictionary];
-  message.mapFixed32Fixed32 = [GPBUInt32UInt32Dictionary dictionary];
-  message.mapFixed64Fixed64 = [GPBUInt64UInt64Dictionary dictionary];
-  message.mapSfixed32Sfixed32 = [GPBInt32Int32Dictionary dictionary];
-  message.mapSfixed64Sfixed64 = [GPBInt64Int64Dictionary dictionary];
-  message.mapInt32Float = [GPBInt32FloatDictionary dictionary];
-  message.mapInt32Double = [GPBInt32DoubleDictionary dictionary];
-  message.mapBoolBool = [GPBBoolBoolDictionary dictionary];
-  message.mapStringString = [NSMutableDictionary dictionary];
-  message.mapInt32Bytes = [GPBInt32ObjectDictionary dictionary];
-  message.mapInt32Enum = [GPBInt32EnumDictionary
-      dictionaryWithValidationFunction:MapEnum_IsValidValue];
-  message.mapInt32ForeignMessage = [GPBInt32ObjectDictionary dictionary];
-
   for (uint32_t i = 0; i < count; i++) {
     [message.mapInt32Int32 setValue:(i + 1) forKey:100 + i * 100];
     [message.mapInt64Int64 setValue:(i + 1) forKey:101 + i * 100];
@@ -1101,7 +1110,7 @@ const uint32_t kGPBDefaultRepeatCount = 2;
     [dataStr release];
 
     NSData *data = [[NSData alloc] initWithUint32_gpbtu:i + 1];
-    [message.mapInt32Bytes setValue:data forKey:113 + i * 100];
+    [message.mapInt32Bytes setObject:data forKey:113 + i * 100];
     [data release];
 
     [message.mapInt32Enum
@@ -1110,9 +1119,75 @@ const uint32_t kGPBDefaultRepeatCount = 2;
 
     ForeignMessage *subMsg = [[ForeignMessage alloc] init];
     subMsg.c = i + 1;
-    [message.mapInt32ForeignMessage setValue:subMsg forKey:115 + i * 100];
+    [message.mapInt32ForeignMessage setObject:subMsg forKey:115 + i * 100];
     [subMsg release];
   }
+}
+
+- (void)setAllTestPackedFields:(TestPackedTypes *)message {
+  // Must match -setAllTestUnpackedFields:
+  [message.packedInt32Array addValue:101];
+  [message.packedInt64Array addValue:102];
+  [message.packedUint32Array addValue:103];
+  [message.packedUint64Array addValue:104];
+  [message.packedSint32Array addValue:105];
+  [message.packedSint64Array addValue:106];
+  [message.packedFixed32Array addValue:107];
+  [message.packedFixed64Array addValue:108];
+  [message.packedSfixed32Array addValue:109];
+  [message.packedSfixed64Array addValue:110];
+  [message.packedFloatArray addValue:111.f];
+  [message.packedDoubleArray addValue:112.];
+  [message.packedBoolArray addValue:YES];
+  [message.packedEnumArray addValue:ForeignEnum_ForeignBar];
+
+  [message.packedInt32Array addValue:201];
+  [message.packedInt64Array addValue:302];
+  [message.packedUint32Array addValue:203];
+  [message.packedUint64Array addValue:204];
+  [message.packedSint32Array addValue:205];
+  [message.packedSint64Array addValue:206];
+  [message.packedFixed32Array addValue:207];
+  [message.packedFixed64Array addValue:208];
+  [message.packedSfixed32Array addValue:209];
+  [message.packedSfixed64Array addValue:210];
+  [message.packedFloatArray addValue:211.f];
+  [message.packedDoubleArray addValue:212.];
+  [message.packedBoolArray addValue:NO];
+  [message.packedEnumArray addValue:ForeignEnum_ForeignBaz];
+}
+
+- (void)setAllTestUnpackedFields:(TestUnpackedTypes *)message {
+  // Must match -setAllTestPackedFields:
+  [message.unpackedInt32Array addValue:101];
+  [message.unpackedInt64Array addValue:102];
+  [message.unpackedUint32Array addValue:103];
+  [message.unpackedUint64Array addValue:104];
+  [message.unpackedSint32Array addValue:105];
+  [message.unpackedSint64Array addValue:106];
+  [message.unpackedFixed32Array addValue:107];
+  [message.unpackedFixed64Array addValue:108];
+  [message.unpackedSfixed32Array addValue:109];
+  [message.unpackedSfixed64Array addValue:110];
+  [message.unpackedFloatArray addValue:111.f];
+  [message.unpackedDoubleArray addValue:112.];
+  [message.unpackedBoolArray addValue:YES];
+  [message.unpackedEnumArray addValue:ForeignEnum_ForeignBar];
+
+  [message.unpackedInt32Array addValue:201];
+  [message.unpackedInt64Array addValue:302];
+  [message.unpackedUint32Array addValue:203];
+  [message.unpackedUint64Array addValue:204];
+  [message.unpackedSint32Array addValue:205];
+  [message.unpackedSint64Array addValue:206];
+  [message.unpackedFixed32Array addValue:207];
+  [message.unpackedFixed64Array addValue:208];
+  [message.unpackedSfixed32Array addValue:209];
+  [message.unpackedSfixed64Array addValue:210];
+  [message.unpackedFloatArray addValue:211.f];
+  [message.unpackedDoubleArray addValue:212.];
+  [message.unpackedBoolArray addValue:NO];
+  [message.unpackedEnumArray addValue:ForeignEnum_ForeignBaz];
 }
 
 - (GPBExtensionRegistry *)extensionRegistry {
@@ -1207,6 +1282,7 @@ const uint32_t kGPBDefaultRepeatCount = 2;
   XCTAssertEqualObjects(message.optionalCord, @"");
 
   // Repeated fields are empty.
+
   XCTAssertEqual(0U, message.repeatedInt32Array.count);
   XCTAssertEqual(0U, message.repeatedInt64Array.count);
   XCTAssertEqual(0U, message.repeatedUint32Array.count);
@@ -1233,6 +1309,33 @@ const uint32_t kGPBDefaultRepeatCount = 2;
 
   XCTAssertEqual(0U, message.repeatedStringPieceArray.count);
   XCTAssertEqual(0U, message.repeatedCordArray.count);
+
+  XCTAssertEqual(0U, message.repeatedInt32Array_Count);
+  XCTAssertEqual(0U, message.repeatedInt64Array_Count);
+  XCTAssertEqual(0U, message.repeatedUint32Array_Count);
+  XCTAssertEqual(0U, message.repeatedUint64Array_Count);
+  XCTAssertEqual(0U, message.repeatedSint32Array_Count);
+  XCTAssertEqual(0U, message.repeatedSint64Array_Count);
+  XCTAssertEqual(0U, message.repeatedFixed32Array_Count);
+  XCTAssertEqual(0U, message.repeatedFixed64Array_Count);
+  XCTAssertEqual(0U, message.repeatedSfixed32Array_Count);
+  XCTAssertEqual(0U, message.repeatedSfixed64Array_Count);
+  XCTAssertEqual(0U, message.repeatedFloatArray_Count);
+  XCTAssertEqual(0U, message.repeatedDoubleArray_Count);
+  XCTAssertEqual(0U, message.repeatedBoolArray_Count);
+  XCTAssertEqual(0U, message.repeatedStringArray_Count);
+  XCTAssertEqual(0U, message.repeatedBytesArray_Count);
+
+  XCTAssertEqual(0U, message.repeatedGroupArray_Count);
+  XCTAssertEqual(0U, message.repeatedNestedMessageArray_Count);
+  XCTAssertEqual(0U, message.repeatedForeignMessageArray_Count);
+  XCTAssertEqual(0U, message.repeatedImportMessageArray_Count);
+  XCTAssertEqual(0U, message.repeatedNestedEnumArray_Count);
+  XCTAssertEqual(0U, message.repeatedForeignEnumArray_Count);
+  XCTAssertEqual(0U, message.repeatedImportEnumArray_Count);
+
+  XCTAssertEqual(0U, message.repeatedStringPieceArray_Count);
+  XCTAssertEqual(0U, message.repeatedCordArray_Count);
 
   // hasBlah() should also be NO for all default fields.
   XCTAssertFalse(message.hasDefaultInt32);
@@ -1492,6 +1595,7 @@ const uint32_t kGPBDefaultRepeatCount = 2;
   // ModifyRepeatedFields only sets the second repeated element of each
   // field.  In addition to verifying this, we also verify that the first
   // element and size were *not* modified.
+
   XCTAssertEqual(count, message.repeatedInt32Array.count);
   XCTAssertEqual(count, message.repeatedInt64Array.count);
   XCTAssertEqual(count, message.repeatedUint32Array.count);
@@ -1518,6 +1622,33 @@ const uint32_t kGPBDefaultRepeatCount = 2;
 
   XCTAssertEqual(count, message.repeatedStringPieceArray.count);
   XCTAssertEqual(count, message.repeatedCordArray.count);
+
+  XCTAssertEqual(count, message.repeatedInt32Array_Count);
+  XCTAssertEqual(count, message.repeatedInt64Array_Count);
+  XCTAssertEqual(count, message.repeatedUint32Array_Count);
+  XCTAssertEqual(count, message.repeatedUint64Array_Count);
+  XCTAssertEqual(count, message.repeatedSint32Array_Count);
+  XCTAssertEqual(count, message.repeatedSint64Array_Count);
+  XCTAssertEqual(count, message.repeatedFixed32Array_Count);
+  XCTAssertEqual(count, message.repeatedFixed64Array_Count);
+  XCTAssertEqual(count, message.repeatedSfixed32Array_Count);
+  XCTAssertEqual(count, message.repeatedSfixed64Array_Count);
+  XCTAssertEqual(count, message.repeatedFloatArray_Count);
+  XCTAssertEqual(count, message.repeatedDoubleArray_Count);
+  XCTAssertEqual(count, message.repeatedBoolArray_Count);
+  XCTAssertEqual(count, message.repeatedStringArray_Count);
+  XCTAssertEqual(count, message.repeatedBytesArray_Count);
+
+  XCTAssertEqual(count, message.repeatedGroupArray_Count);
+  XCTAssertEqual(count, message.repeatedNestedMessageArray_Count);
+  XCTAssertEqual(count, message.repeatedForeignMessageArray_Count);
+  XCTAssertEqual(count, message.repeatedImportMessageArray_Count);
+  XCTAssertEqual(count, message.repeatedNestedEnumArray_Count);
+  XCTAssertEqual(count, message.repeatedForeignEnumArray_Count);
+  XCTAssertEqual(count, message.repeatedImportEnumArray_Count);
+
+  XCTAssertEqual(count, message.repeatedStringPieceArray_Count);
+  XCTAssertEqual(count, message.repeatedCordArray_Count);
 
   XCTAssertEqual(201, [message.repeatedInt32Array valueAtIndex:0]);
   XCTAssertEqual(202LL, [message.repeatedInt64Array valueAtIndex:0]);
@@ -1581,105 +1712,101 @@ const uint32_t kGPBDefaultRepeatCount = 2;
 
 - (void)setPackedFields:(TestPackedTypes *)message
           repeatedCount:(uint32_t)count {
-  {
-    GPBInt32Array *scratch = [GPBInt32Array array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:601 + i * 100];
-    }
-    [message setPackedInt32Array:scratch];
+  // Must match -setUnpackedFields:repeatedCount:
+  // Must match -setPackedExtensions:repeatedCount:
+  // Must match -setUnpackedExtensions:repeatedCount:
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedInt32Array addValue:601 + i * 100];
   }
-  {
-    GPBInt64Array *scratch = [GPBInt64Array array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:602 + i * 100];
-    }
-    [message setPackedInt64Array:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedInt64Array addValue:602 + i * 100];
   }
-  {
-    GPBUInt32Array *scratch = [GPBUInt32Array array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:603 + i * 100];
-    }
-    [message setPackedUint32Array:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedUint32Array addValue:603 + i * 100];
   }
-  {
-    GPBUInt64Array *scratch = [GPBUInt64Array array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:604 + i * 100];
-    }
-    [message setPackedUint64Array:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedUint64Array addValue:604 + i * 100];
   }
-  {
-    GPBInt32Array *scratch = [GPBInt32Array array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:605 + i * 100];
-    }
-    [message setPackedSint32Array:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedSint32Array addValue:605 + i * 100];
   }
-  {
-    GPBInt64Array *scratch = [GPBInt64Array array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:606 + i * 100];
-    }
-    [message setPackedSint64Array:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedSint64Array addValue:606 + i * 100];
   }
-  {
-    GPBUInt32Array *scratch = [GPBUInt32Array array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:607 + i * 100];
-    }
-    [message setPackedFixed32Array:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedFixed32Array addValue:607 + i * 100];
   }
-  {
-    GPBUInt64Array *scratch = [GPBUInt64Array array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:608 + i * 100];
-    }
-    [message setPackedFixed64Array:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedFixed64Array addValue:608 + i * 100];
   }
-  {
-    GPBInt32Array *scratch = [GPBInt32Array array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:609 + i * 100];
-    }
-    [message setPackedSfixed32Array:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedSfixed32Array addValue:609 + i * 100];
   }
-  {
-    GPBInt64Array *scratch = [GPBInt64Array array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:610 + i * 100];
-    }
-    [message setPackedSfixed64Array:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedSfixed64Array addValue:610 + i * 100];
   }
-  {
-    GPBFloatArray *scratch = [GPBFloatArray array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:611 + i * 100];
-    }
-    [message setPackedFloatArray:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedFloatArray addValue:611 + i * 100];
   }
-  {
-    GPBDoubleArray *scratch = [GPBDoubleArray array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:612 + i * 100];
-    }
-    [message setPackedDoubleArray:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedDoubleArray addValue:612 + i * 100];
   }
-  {
-    GPBBoolArray *scratch = [GPBBoolArray array];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch addValue:(i % 2) ? YES : NO];
-    }
-    [message setPackedBoolArray:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedBoolArray addValue:(i % 2) ? YES : NO];
   }
-  {
-    GPBEnumArray *scratch =
-        [GPBEnumArray arrayWithValidationFunction:ForeignEnum_IsValidValue];
-    for (uint32_t i = 0; i < count; ++i) {
-      [scratch
-          addValue:(i % 2) ? ForeignEnum_ForeignBar : ForeignEnum_ForeignBaz];
-    }
-    [message setPackedEnumArray:scratch];
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.packedEnumArray
+        addValue:(i % 2) ? ForeignEnum_ForeignBar : ForeignEnum_ForeignBaz];
+  }
+}
+
+- (void)setUnpackedFields:(TestUnpackedTypes *)message
+            repeatedCount:(uint32_t)count {
+  // Must match -setPackedFields:repeatedCount:
+  // Must match -setPackedExtensions:repeatedCount:
+  // Must match -setUnpackedExtensions:repeatedCount:
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedInt32Array addValue:601 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedInt64Array addValue:602 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedUint32Array addValue:603 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedUint64Array addValue:604 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedSint32Array addValue:605 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedSint64Array addValue:606 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedFixed32Array addValue:607 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedFixed64Array addValue:608 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedSfixed32Array addValue:609 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedSfixed64Array addValue:610 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedFloatArray addValue:611 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedDoubleArray addValue:612 + i * 100];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedBoolArray addValue:(i % 2) ? YES : NO];
+  }
+  for (uint32_t i = 0; i < count; ++i) {
+    [message.unpackedEnumArray
+        addValue:(i % 2) ? ForeignEnum_ForeignBar : ForeignEnum_ForeignBaz];
   }
 }
 
@@ -1726,6 +1853,9 @@ const uint32_t kGPBDefaultRepeatCount = 2;
 
 - (void)setPackedExtensions:(TestPackedExtensions *)message
               repeatedCount:(uint32_t)count {
+  // Must match -setPackedFields:repeatedCount:
+  // Must match -setUnpackedFields:repeatedCount:
+  // Must match -setUnpackedExtensions:repeatedCount:
   for (uint32_t i = 0; i < count; i++) {
     [message addExtension:[UnittestRoot packedInt32Extension]
                     value:@(601 + i * 100)];
@@ -1756,6 +1886,44 @@ const uint32_t kGPBDefaultRepeatCount = 2;
     [message addExtension:[UnittestRoot packedEnumExtension]
                     value:@((i % 2) ? ForeignEnum_ForeignBar
                                     : ForeignEnum_ForeignBaz)];
+  }
+}
+
+- (void)setUnpackedExtensions:(TestUnpackedExtensions *)message
+                repeatedCount:(uint32_t)count {
+  // Must match -setPackedFields:repeatedCount:
+  // Must match -setUnpackedFields:repeatedCount:
+  // Must match -setPackedExtensions:repeatedCount:
+  for (uint32_t i = 0; i < count; i++) {
+    [message addExtension:[UnittestRoot unpackedInt32Extension]
+                    value:@(601 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedInt64Extension]
+                    value:@(602 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedUint32Extension]
+                    value:@(603 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedUint64Extension]
+                    value:@(604 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedSint32Extension]
+                    value:@(605 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedSint64Extension]
+                    value:@(606 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedFixed32Extension]
+                    value:@(607 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedFixed64Extension]
+                    value:@(608 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedSfixed32Extension]
+                    value:@(609 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedSfixed64Extension]
+                    value:@(610 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedFloatExtension]
+                    value:@(611 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedDoubleExtension]
+                    value:@(612 + i * 100)];
+    [message addExtension:[UnittestRoot unpackedBoolExtension]
+                    value:@((i % 2) ? YES : NO)];
+    [message addExtension:[UnittestRoot unpackedEnumExtension]
+                    value:@((i % 2) ? ForeignEnum_ForeignBar
+                         : ForeignEnum_ForeignBaz)];
   }
 }
 
@@ -1901,6 +2069,34 @@ const uint32_t kGPBDefaultRepeatCount = 2;
 
   XCTAssertEqualObjects(message.repeatedStringPieceArray, [message valueForKey:@"repeatedStringPieceArray"]);
   XCTAssertEqualObjects(message.repeatedCordArray, [message valueForKey:@"repeatedCordArray"]);
+
+  XCTAssertEqualObjects(@(message.repeatedInt32Array_Count), [message valueForKey:@"repeatedInt32Array_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedInt64Array_Count), [message valueForKey:@"repeatedInt64Array_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedUint32Array_Count), [message valueForKey:@"repeatedUint32Array_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedUint64Array_Count), [message valueForKey:@"repeatedUint64Array_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedSint32Array_Count), [message valueForKey:@"repeatedSint32Array_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedSint64Array_Count), [message valueForKey:@"repeatedSint64Array_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedFixed32Array_Count), [message valueForKey:@"repeatedFixed32Array_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedFixed64Array_Count), [message valueForKey:@"repeatedFixed64Array_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedSfixed32Array_Count), [message valueForKey:@"repeatedSfixed32Array_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedSfixed64Array_Count), [message valueForKey:@"repeatedSfixed64Array_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedFloatArray_Count), [message valueForKey:@"repeatedFloatArray_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedDoubleArray_Count), [message valueForKey:@"repeatedDoubleArray_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedBoolArray_Count), [message valueForKey:@"repeatedBoolArray_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedStringArray_Count), [message valueForKey:@"repeatedStringArray_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedBytesArray_Count), [message valueForKey:@"repeatedBytesArray_Count"]);
+
+  XCTAssertEqualObjects(@(message.repeatedGroupArray_Count), [message valueForKey:@"repeatedGroupArray_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedNestedMessageArray_Count), [message valueForKey:@"repeatedNestedMessageArray_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedForeignMessageArray_Count), [message valueForKey:@"repeatedForeignMessageArray_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedImportMessageArray_Count), [message valueForKey:@"repeatedImportMessageArray_Count"]);
+
+  XCTAssertEqualObjects(@(message.repeatedNestedEnumArray_Count), [message valueForKey:@"repeatedNestedEnumArray_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedForeignEnumArray_Count), [message valueForKey:@"repeatedForeignEnumArray_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedImportEnumArray_Count), [message valueForKey:@"repeatedImportEnumArray_Count"]);
+
+  XCTAssertEqualObjects(@(message.repeatedStringPieceArray_Count), [message valueForKey:@"repeatedStringPieceArray_Count"]);
+  XCTAssertEqualObjects(@(message.repeatedCordArray_Count), [message valueForKey:@"repeatedCordArray_Count"]);
 
   // -----------------------------------------------------------------
 

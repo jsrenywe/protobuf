@@ -135,26 +135,25 @@ inline ObjectiveCType GetObjectiveCType(const FieldDescriptor* field) {
 bool IsPrimitiveType(const FieldDescriptor* field);
 bool IsReferenceType(const FieldDescriptor* field);
 
-string GPBValueFieldName(const FieldDescriptor* field);
+string GPBGenericValueFieldName(const FieldDescriptor* field);
 string DefaultValue(const FieldDescriptor* field);
 
 string BuildFlagsString(const vector<string>& strings);
 
 string BuildCommentsString(const SourceLocation& location);
 
-bool WriteClassList(string* error);
-void WriteClassNameToClassList(const string& name);
-
-bool InitializeClassWhitelist(string* error);
-bool FilterClass(const string& name);
+// Checks the prefix for a given file and outputs any warnings needed, if
+// there are flat out errors, then out_error is filled in and the result is
+// false.
+bool ValidateObjCClassPrefix(const FileDescriptor* file, string *out_error);
 
 // Generate decode data needed for ObjC's GPBDecodeTextFormatName() to transform
 // the input into the the expected output.
-class TextFormatDecodeData {
+class LIBPROTOC_EXPORT TextFormatDecodeData {
  public:
   TextFormatDecodeData() {}
 
-  void AddString(int32_t key, const string& input_for_decode,
+  void AddString(int32 key, const string& input_for_decode,
                  const string& desired_output);
   size_t num_entries() const { return entries_.size(); }
   string Data() const;
@@ -165,7 +164,7 @@ class TextFormatDecodeData {
  private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(TextFormatDecodeData);
 
-  typedef std::pair<int32_t, string> DataEntry;
+  typedef std::pair<int32, string> DataEntry;
   vector<DataEntry> entries_;
 };
 
